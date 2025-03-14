@@ -2,54 +2,6 @@
 
 open Printf
 
-type static_type =
-  | Class of string (* ex "Int" or "Object" *)
-  | SELF_TYPE of string
-
-type class_map = int * cool_class list 
-and name = string 
-and cool_type = string
-and cool_class = name * int * attribute list 
-and attribute = string * name * cool_type * exp option
-and exp = {
-  loc : int;
-  exp_kind : exp_kind;
-  static_type : static_type;
-}
-and exp_kind =
-  | Assign of name * exp (* assign *)
-  | Dynamic_Dispatch of exp * name * exp list
-  | Static_Dispatch of exp * name * name * exp list
-  | Self_Dispatch of name * exp list
-  | If of exp * exp * exp
-  | While of exp * exp
-  | Block of exp list
-  | New of name
-  | Isvoid of exp
-  | Plus of exp * exp
-  | Minus of exp * exp
-  | Times of exp * exp
-  | Divide of exp * exp
-  | Lt of exp * exp
-  | Le of exp * exp
-  | Eq of exp * exp
-  | Not of exp
-  | Negate of exp
-  | Integer of int
-  | String of string
-  | Identifier of name
-  | Bool of string (* bool *)
-  | Let of binding list * exp
-  | Case of exp * case_elem list
-  | Internal of
-      string
-      * string
-      * string (* return class, class its defined in, method name *)
-and binding = Binding of name * cool_type * exp option
-and case_elem = Case_Elem of name * cool_type * exp
-
-
-
 let main() = (
   let fname = Sys.argv.(1) in 
   let fin = open_in fname in 
@@ -63,40 +15,65 @@ let main() = (
 
   (* deserialize class map *)
   let rec read_class_map () = (
-    let _ = read () in (* skip "class_map" *)
-    let num_classes = int_of_string(read()) in 
-    let classes = read_list read_class in
-    (num_classes, classes)
+    let _ = read () in (* read "class_map" and skip *)
+    let classes = read_list read_class_class_map in 
+    (classes)
   ) 
-  and read_class () = (
+  and read_class_class_map () = (
     let cname = read () in 
-    let nattr = int_of_string(read()) in 
-    let attrlist = read_list read_attr in 
-    (cname, nattr, attrlist)
+    let attrs = read_list read_attr in 
+    (cname, attrs)
   )
   and read_attr () = (
     let init = read () in 
     let aname = read () in 
     let atype = read () in 
-    (match init with 
-    | "no_initializer" -> ()
-    | "initializer" -> read_exp ()
-    | _ -> failwith "wtf");
-    (init, aname, atype)
+    let aexp = match init with
+    | "no_initializer" -> None
+    | "initializer" -> Some(read_exp ()) 
+    | _ -> failwith "attr read failed in read_class_map"
+  in (aname, atype, aexp)
   )
-in 
-  
-  let read_impl_map () = () in 
+  (* TODO: implement reading output expressions from PA2 *)
+  and read_exp () = (
 
-  let read_parent_map () = () in 
+  )
+  and read_impl_map () = (
+    let _ = read () in (* read "implementation_map" *)
+    let classes = read_list read_class_imp_map
+  in (classes)
+  ) 
+  and read_class_imp_map () = (
+    let cname = read () in  
+    let methods = read_list read_method in 
+    (cname, methods)
+  )
+  and read_method () = (
+    let mname = read () in 
+    let formals = read_list read in 
+    let parent = read () in 
+    let mbody = read_exp () in 
+    (mname, formals, parent, mbody)
+  )
+  and read_parent_map () = (
+    let _ = read () in (* read "parent_map" *)
+    let relations = read_list read_relations in 
+    (relations)
+  ) 
+  and read_relations () = (
+    let child = read () in 
+    let parent = read () in 
+    (child, parent)
+  )
+  (* TODO: implement reading the annotated AST from PA2 *)
+  and read_ast () = (
 
-  let read_ast () = () in 
-
+  ) in 
   let rec read_cltype () = 
     let class_map = read_class_map () in
     let impl_map = read_impl_map () in
     let parent_map = read_parent_map () in
-    let a_ast = read_ast () in 
+    let ast = read_ast () in 
     ()
   in 
 
