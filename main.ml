@@ -88,7 +88,7 @@ and exp_kind =
 
 and binding = Binding of id * cool_type * exp option
 and case_elem = Case_Elem of id * cool_type * exp
-
+let varCount = ref 0;;
 
 let main() = (
   let fname = Sys.argv.(1) in 
@@ -333,7 +333,11 @@ let main() = (
 
   (* TODO: return a unique variable name *)
   let fresh_var () = (
-    "fresh"
+    let newVar = 
+    sprintf "t$%d" !varCount
+    in
+    varCount := !varCount +1;
+    newVar
   ) in
 
   let cltname = Filename.chop_extension fname ^ ".cl-tac" in
