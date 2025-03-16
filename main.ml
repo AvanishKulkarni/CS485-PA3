@@ -30,15 +30,10 @@ type tac_instr =
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
   | TAC_Assign_Let of label * tac_expr list
-and arithop = 
-  | Add  
-  | Sub 
-  | Mul 
-  | Div 
-and compop = 
-  | Lt
-  | Le
-  | Eq
+  | TAC_Branch_True of bconst * label
+  | TAC_Comment of string
+  | TAC_Label of label
+  | TAC_Jump of label
 and tac_expr =
   | TAC_Variable of label
 and label = string
@@ -104,6 +99,7 @@ and exp_kind =
 and binding = Binding of id * cool_type * exp option
 and case_elem = Case_Elem of id * cool_type * exp
 let varCount = ref 0;;
+let labelCount = ref 1;;
 
 let main() = (
   let fname = Sys.argv.(1) in 
@@ -351,6 +347,11 @@ let main() = (
     varCount := !varCount +1;
     newVar
   ) in
+  let fresh_label (cname, mname) = (
+    let newLabel = 
+      (sprintf "%s_%s_%d" cname mname !labelCount) in labelCount := !labelCount + 1;
+      newLabel
+  ) in
   let ident_tac : (name, (tac_expr)) Hashtbl.t = Hashtbl.create 255 in
   let rec convert (a: exp_kind) (var : name) : (tac_instr list * tac_expr) = (
     match a with
@@ -434,7 +435,7 @@ let main() = (
       | Block(exp) ->
         let retTacInstr = ref [] in
         let last_statement = List.hd (List.rev exp) in
-        let rest_of_list = List.rev(List.tl (List.rev exp))in
+        let rest_of_list = List.rev(List.tl (List.rev exp)) in
         List.iter( fun e ->
           let i1, ta1 = convert e.exp_kind (fresh_var()) in
           retTacInstr := List.append !retTacInstr i1
@@ -502,6 +503,27 @@ let main() = (
             bindlist;
         (!retTacInstr @ i), TAC_Variable(var)
       (* Need to finish rest of tac for objects and conditionals*)
+      | If (pred, astthen, astelse) -> 
+        let thenvar = fresh_var () in 
+        let thenlbl = fresh_label ("Main", "main") in 
+        let elsevar = fresh_var () in 
+        let elselbl = fresh_label ("Main", "main") in 
+        let joinlbl = fresh_label ("Main", "main") in 
+        let pinstr, pexp = convert pred.exp_kind (thenvar) in 
+        let notc = TAC_Assign_BoolNegate(elsevar, pexp) in
+        let bt = TAC_Branch_True(thenvar, thenlbl) in
+        let be = TAC_Branch_True(elsevar, elselbl) in 
+        let tcomm = TAC_Comment("then branch") in 
+        let tlbl = TAC_Label(thenlbl) in
+        let ecomm = TAC_Comment("else branch") in 
+        let elbl = TAC_Label(elselbl) in 
+        let jcomm = TAC_Comment("if-join") in 
+        let jlbl = TAC_Label(joinlbl) in 
+        let jjmp = TAC_Jump(joinlbl) in 
+        let tinstr, texp = convert astthen.exp_kind (var) in 
+        let einstr, eexp = convert astelse.exp_kind (var) in 
+
+        pinstr @ [notc] @ [be] @ [bt] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -546,6 +568,14 @@ let main() = (
         fprintf fout "%s <- new %s\n" var name
       | TAC_Assign_Default(var, name) ->
         fprintf fout "%s <- default %s\n" var name;
+      | TAC_Branch_True(cond, label) -> 
+        fprintf fout "bt %s %s\n" cond label; 
+      | TAC_Comment(comment) ->
+        fprintf fout "comment %s\n" comment;
+      | TAC_Jump(label) -> 
+        fprintf fout "jmp %s\n" label;
+      | TAC_Label(label) ->
+        fprintf fout "label %s\n" label
       (* Need to finish the rest of assign statements for objects and conditional blocks*)
       | _ -> fprintf fout ""
 
@@ -575,13 +605,4 @@ let main() = (
 ) ;;
 
 main ()
-
-
-
-
-
-(* read in cl-type file *)
-
-
-(* generate cl-tac file for main() in Main *)
 
