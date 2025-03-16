@@ -30,6 +30,7 @@ type tac_instr =
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
   | TAC_Assign_Let of label * tac_expr list
+  | TAC_Assign_Assign of label * tac_expr
 and arithop = 
   | Add  
   | Sub 
@@ -501,6 +502,11 @@ let main() = (
               )
             bindlist;
         (!retTacInstr @ i), TAC_Variable(var)
+      | Assign((_, name), exp) ->
+        Hashtbl.add ident_tac name (TAC_Variable(name));
+        let i, ta = convert exp.exp_kind name in
+        let to_output = TAC_Assign_Assign(var, ta) in
+        (i @ [to_output]), (TAC_Variable(name))
       (* Need to finish rest of tac for objects and conditionals*)
       | _ -> [], TAC_Variable("None")
   )
@@ -546,6 +552,8 @@ let main() = (
         fprintf fout "%s <- new %s\n" var name
       | TAC_Assign_Default(var, name) ->
         fprintf fout "%s <- default %s\n" var name;
+      | TAC_Assign_Assign(var, i) ->
+        fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
       (* Need to finish the rest of assign statements for objects and conditional blocks*)
       | _ -> fprintf fout ""
 
