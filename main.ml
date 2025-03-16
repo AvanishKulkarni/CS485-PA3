@@ -6,18 +6,26 @@ type tac_instr =
   | IConst of iconst
   | BConst of bconst
   | SConst of sconst 
-  | Arith of arithop * iconst * iconst 
-  | Comp of compop * iconst * iconst 
-  | BoolNegate of bconst
-  | ArithNegate of iconst
-  | ObjectAlloc of cool_type 
-  | ObjectDefault of cool_type 
-  | NullCheck of string 
-  | FunctionCall of string option 
   | Jump of label
   | Label of label
   | Return of string
   | BranchTrue of bconst * label
+  | TAC_Assign_Int of label * iconst
+  | TAC_Assign_String of label * sconst
+  | TAC_Assign_Bool of label * bconst
+  | TAC_Assign_Plus of label * tac_expr * tac_expr
+  | TAC_Assign_Minus of label * tac_expr * tac_expr
+  | TAC_Assign_Mult of label * tac_expr * tac_expr
+  | TAC_Assign_Div of label * tac_expr * tac_expr
+  | TAC_Assign_Lt of label * tac_expr * tac_expr
+  | TAC_Assign_Le of label * tac_expr * tac_expr
+  | TAC_Assign_Eq of label * tac_expr * tac_expr
+  | TAC_Assign_BoolNegate of label * tac_expr
+  | TAC_Assign_ArithNegate of label * tac_expr
+  | TAC_Assign_ObjectAlloc of label * cool_type (* might have to change to tac_expr *)
+  | TAC_Assign_ObjectDefault of label * cool_type
+  | TAC_Assign_NullCheck of label * tac_expr
+  | TAC_Assign_FunctionCall of label * label * (tac_expr list) option
 and arithop = 
   | Add  
   | Sub 
@@ -27,6 +35,8 @@ and compop =
   | Lt
   | Le
   | Eq
+and tac_expr =
+  | TAC_Variable of label
 and cool_type = string
 and label = string
 and iconst = string
@@ -339,6 +349,14 @@ let main() = (
     varCount := !varCount +1;
     newVar
   ) in
+  let rec convert (a: exp_kind) : (tac_instr list * tac_expr) = 
+    match a with
+      | Identifier(v) -> [], TAC_Variable(v)
+      | Integer(i) ->
+        let new_var = fresh_var () in
+        [TAC_Assign_Int(new_var, i)], (TAC_Variable(new_var))
+      
+      | _
 
   let cltname = Filename.chop_extension fname ^ ".cl-tac" in
   let fout = open_out cltname in
