@@ -10,6 +10,7 @@ type tac_instr =
   | Label of label
   | Return of string
   | BranchTrue of bconst * label
+  | TAC_Assign_Identifier of label * label
   | TAC_Assign_Int of label * iconst
   | TAC_Assign_String of label * sconst
   | TAC_Assign_Bool of label * bconst
@@ -351,8 +352,7 @@ let main() = (
     match a with
       | Identifier(v) -> 
         let _, name = v in
-        varCount := !varCount -1; (* Not using the fresh var here so need to decrement *)
-        [], TAC_Variable(name)
+        [TAC_Assign_Identifier(var, name)], TAC_Variable(var)
       | Integer(i) ->
         [TAC_Assign_Int(var, string_of_int i)], (TAC_Variable(var))
       | Bool(i) ->
@@ -360,38 +360,52 @@ let main() = (
       | String(i) ->
         [TAC_Assign_String(var, i)], (TAC_Variable(var))
       | Plus(a1, a2) ->
-        let i1, ta1 = convert a1.exp_kind (fresh_var ()) in
-        let i2, ta2 = convert a2.exp_kind (fresh_var ()) in
+        let arg1 = fresh_var () in
+        let arg2 = fresh_var () in
+        let i1, ta1 = convert a1.exp_kind arg1 in
+        let i2, ta2 = convert a2.exp_kind arg2 in
         let to_output = TAC_Assign_Plus(var, ta1, ta2) in
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Minus(a1, a2) ->
-        let i1, ta1 = convert a1.exp_kind (fresh_var ()) in
-        let i2, ta2 = convert a2.exp_kind (fresh_var () ) in
+        let arg1 = fresh_var () in
+        let arg2 = fresh_var () in
+        let i1, ta1 = convert a1.exp_kind arg1 in
+        let i2, ta2 = convert a2.exp_kind arg2 in
         let to_output = TAC_Assign_Minus(var, ta1, ta2) in
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Times(a1, a2) -> 
-        let i1, ta1 = convert a1.exp_kind (fresh_var ()) in
-        let i2, ta2 = convert a2.exp_kind (fresh_var ()) in
+        let arg1 = fresh_var () in
+        let arg2 = fresh_var () in
+        let i1, ta1 = convert a1.exp_kind arg1 in
+        let i2, ta2 = convert a2.exp_kind arg2 in
         let to_output = TAC_Assign_Times(var, ta1, ta2) in
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Divide(a1, a2) -> 
-        let i1, ta1 = convert a1.exp_kind (fresh_var ())in
-        let i2, ta2 = convert a2.exp_kind (fresh_var ())in
+        let arg1 = fresh_var () in
+        let arg2 = fresh_var () in
+        let i1, ta1 = convert a1.exp_kind arg1 in
+        let i2, ta2 = convert a2.exp_kind arg2 in
         let to_output = TAC_Assign_Div(var, ta1, ta2) in
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Lt(a1, a2) ->
-        let i1, ta1 = convert a1.exp_kind (fresh_var())in
-        let i2, ta2 = convert a2.exp_kind (fresh_var())in
+        let arg1 = fresh_var () in
+        let arg2 = fresh_var () in
+        let i1, ta1 = convert a1.exp_kind arg1 in
+        let i2, ta2 = convert a2.exp_kind arg2 in
         let to_output = TAC_Assign_Lt(var, ta1, ta2) in
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Le(a1, a2) ->
-        let i1, ta1 = convert a1.exp_kind (fresh_var())in
-        let i2, ta2 = convert a2.exp_kind (fresh_var ())in
+        let arg1 = fresh_var () in
+        let arg2 = fresh_var () in
+        let i1, ta1 = convert a1.exp_kind arg1 in
+        let i2, ta2 = convert a2.exp_kind arg2 in
         let to_output = TAC_Assign_Le(var, ta1, ta2) in
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Eq(a1, a2) ->
-        let i1, ta1 = convert a1.exp_kind (fresh_var())in
-        let i2, ta2 = convert a2.exp_kind (fresh_var())in
+        let arg1 = fresh_var () in
+        let arg2 = fresh_var () in
+        let i1, ta1 = convert a1.exp_kind arg1 in
+        let i2, ta2 = convert a2.exp_kind arg2 in
         let to_output = TAC_Assign_Eq(var, ta1, ta2) in
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Not(a1) ->
@@ -417,6 +431,36 @@ let main() = (
         let i1, _ = convert last_statement.exp_kind var in
         retTacInstr := List.append !retTacInstr i1;
         (!retTacInstr), (TAC_Variable(var))
+      | Dynamic_Dispatch(_, (_, mname), args) ->
+        let retTacInstr = ref [] in
+        let args_vars = ref [] in
+        List.iter(fun a ->
+          let i, ta = convert a.exp_kind (fresh_var()) in
+          retTacInstr := List.append !retTacInstr i;
+          args_vars := List.append !args_vars [ta]
+        ) args;
+        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        (!retTacInstr @ [to_output]), TAC_Variable(var)
+      | Self_Dispatch((_,mname), args) -> 
+        let retTacInstr = ref [] in
+        let args_vars = ref [] in
+        List.iter(fun a ->
+          let i, ta = convert a.exp_kind (fresh_var()) in
+          retTacInstr := List.append !retTacInstr i;
+          args_vars := List.append !args_vars [ta]
+        ) args;
+        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        (!retTacInstr @ [to_output]), TAC_Variable(var)
+      | Static_Dispatch(_, _, (_, mname), args) ->
+        let retTacInstr = ref [] in
+        let args_vars = ref [] in
+        List.iter(fun a ->
+          let i, ta = convert a.exp_kind (fresh_var()) in
+          retTacInstr := List.append !retTacInstr i;
+          args_vars := List.append !args_vars [ta]
+        ) args;
+        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        (!retTacInstr @ [to_output]), TAC_Variable(var)
       (* Need to finish rest of tac for objects and conditionals*)
       | _ -> [], TAC_Variable("None")
   )
@@ -424,6 +468,8 @@ let main() = (
   let output_tac fout tac_instructions = (
     List.iter ( fun x ->
       match x with
+      | TAC_Assign_Identifier(var, i) ->
+        fprintf fout "%s <- %s\n" var i
       | TAC_Assign_Int(var, i) ->
         fprintf fout "%s <- int %s\n" var i
       | TAC_Assign_Bool(var, i) ->
@@ -450,6 +496,12 @@ let main() = (
         fprintf fout "%s <- not %s\n" var (tac_expr_to_name i)
       | TAC_Assign_NullCheck(var, i) ->
         fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_FunctionCall(var, mname, None) ->
+        fprintf fout "%s <- call %s\n" var mname;
+      | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
+        fprintf fout "%s <- call %s" var mname;
+        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+        fprintf fout "\n";
       (* Need to finish the rest of assign statements for objects and conditional blocks*)
       | _ -> fprintf fout ""
 
