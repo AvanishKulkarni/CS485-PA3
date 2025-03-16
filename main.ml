@@ -595,7 +595,13 @@ let main() = (
   let _, _, _, ast = cltype in (
     (* given the AST, convert it to a tac instruction *)
     fprintf fout "comment start\n";
-    let (_, cname), _, features = List.hd ast in
+    let compare_ast (a : cool_class) (b : cool_class) : int = (
+      let ((_, aname), _, _) = a in 
+      let ((_, bname), _, _) = b in 
+      compare aname bname 
+    ) in 
+    let sorted_ast = List.sort compare_ast ast in 
+    let (_, cname), _, features = List.hd sorted_ast in
     let first_method = List.find (fun x -> 
       match x with 
       | Method _ -> true 
@@ -608,7 +614,6 @@ let main() = (
       output_tac fout tac_instructions;
       fprintf fout "return %s\n" (tac_expr_to_name tac_var)
     | _ -> fprintf fout ""
-
   )
 ) ;;
 
