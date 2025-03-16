@@ -347,87 +347,76 @@ let main() = (
     varCount := !varCount +1;
     newVar
   ) in
-  let rec convert (a: exp_kind) : (tac_instr list * tac_expr) = (
+  let rec convert (a: exp_kind) (var : name) : (tac_instr list * tac_expr) = (
     match a with
       | Identifier(v) -> 
         let _, name = v in
+        varCount := !varCount -1; (* Not using the fresh var here so need to decrement *)
         [], TAC_Variable(name)
       | Integer(i) ->
-        let new_var = fresh_var () in
-        [TAC_Assign_Int(new_var, string_of_int i)], (TAC_Variable(new_var))
+        [TAC_Assign_Int(var, string_of_int i)], (TAC_Variable(var))
       | Bool(i) ->
-        let new_var = fresh_var () in
-        [TAC_Assign_Bool(new_var, i)], (TAC_Variable(new_var))
+        [TAC_Assign_Bool(var, i)], (TAC_Variable(var))
       | String(i) ->
-        let new_var = fresh_var () in
-        [TAC_Assign_String(new_var, i)], (TAC_Variable(new_var))
+        [TAC_Assign_String(var, i)], (TAC_Variable(var))
       | Plus(a1, a2) ->
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let i2, ta2 = convert a2.exp_kind in
-        let to_output = TAC_Assign_Plus(new_var, ta1, ta2) in
-        (i1 @ i2 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var ()) in
+        let i2, ta2 = convert a2.exp_kind (fresh_var ()) in
+        let to_output = TAC_Assign_Plus(var, ta1, ta2) in
+        (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Minus(a1, a2) ->
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let i2, ta2 = convert a2.exp_kind in
-        let to_output = TAC_Assign_Minus(new_var, ta1, ta2) in
-        (i1 @ i2 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var ()) in
+        let i2, ta2 = convert a2.exp_kind (fresh_var () ) in
+        let to_output = TAC_Assign_Minus(var, ta1, ta2) in
+        (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Times(a1, a2) -> 
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let i2, ta2 = convert a2.exp_kind in
-        let to_output = TAC_Assign_Times(new_var, ta1, ta2) in
-        (i1 @ i2 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var ()) in
+        let i2, ta2 = convert a2.exp_kind (fresh_var ()) in
+        let to_output = TAC_Assign_Times(var, ta1, ta2) in
+        (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Divide(a1, a2) -> 
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let i2, ta2 = convert a2.exp_kind in
-        let to_output = TAC_Assign_Div(new_var, ta1, ta2) in
-        (i1 @ i2 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var ())in
+        let i2, ta2 = convert a2.exp_kind (fresh_var ())in
+        let to_output = TAC_Assign_Div(var, ta1, ta2) in
+        (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Lt(a1, a2) ->
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let i2, ta2 = convert a2.exp_kind in
-        let to_output = TAC_Assign_Lt(new_var, ta1, ta2) in
-        (i1 @ i2 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var())in
+        let i2, ta2 = convert a2.exp_kind (fresh_var())in
+        let to_output = TAC_Assign_Lt(var, ta1, ta2) in
+        (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Le(a1, a2) ->
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let i2, ta2 = convert a2.exp_kind in
-        let to_output = TAC_Assign_Le(new_var, ta1, ta2) in
-        (i1 @ i2 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var())in
+        let i2, ta2 = convert a2.exp_kind (fresh_var ())in
+        let to_output = TAC_Assign_Le(var, ta1, ta2) in
+        (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Eq(a1, a2) ->
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let i2, ta2 = convert a2.exp_kind in
-        let to_output = TAC_Assign_Eq(new_var, ta1, ta2) in
-        (i1 @ i2 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var())in
+        let i2, ta2 = convert a2.exp_kind (fresh_var())in
+        let to_output = TAC_Assign_Eq(var, ta1, ta2) in
+        (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Not(a1) ->
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let to_output = TAC_Assign_BoolNegate(new_var, ta1) in
-        (i1 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var()) in
+        let to_output = TAC_Assign_BoolNegate(var, ta1) in
+        (i1 @ [to_output]), (TAC_Variable(var))
       | Negate(a1) ->
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let to_output = TAC_Assign_ArithNegate(new_var, ta1) in
-        (i1 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var())in
+        let to_output = TAC_Assign_ArithNegate(var, ta1) in
+        (i1 @ [to_output]), (TAC_Variable(var))
       | Isvoid(a1) ->
-        let new_var = fresh_var () in
-        let i1, ta1 = convert a1.exp_kind in
-        let to_output = TAC_Assign_NullCheck(new_var, ta1) in
-        (i1 @ [to_output]), (TAC_Variable(new_var))
+        let i1, ta1 = convert a1.exp_kind (fresh_var())in
+        let to_output = TAC_Assign_NullCheck(var, ta1) in
+        (i1 @ [to_output]), (TAC_Variable(var))
       | Block(exp) ->
-        let new_var = fresh_var () in
         let retTacInstr = ref [] in
-        let lastTacVariable = ref (TAC_Variable("None")) in
+        let last_statement = List.hd (List.rev exp) in
+        let rest_of_list = List.rev(List.tl (List.rev exp))in
         List.iter( fun e ->
-          let i1, ta1 = convert e.exp_kind in
-          lastTacVariable := ta1;
+          let i1, ta1 = convert e.exp_kind (fresh_var()) in
           retTacInstr := List.append !retTacInstr i1
-        ) exp;
-        (!retTacInstr), (TAC_Variable(new_var))
+        ) rest_of_list;
+        let i1, _ = convert last_statement.exp_kind var in
+        retTacInstr := List.append !retTacInstr i1;
+        (!retTacInstr), (TAC_Variable(var))
       (* Need to finish rest of tac for objects and conditionals*)
       | _ -> [], TAC_Variable("None")
   )
@@ -481,7 +470,7 @@ let main() = (
     match first_method with
     | Method((_, mname), _, _, mexp) ->
       fprintf fout "label %s_%s_0\n" cname mname;
-      let tac_instructions, tac_var = convert mexp.exp_kind in
+      let tac_instructions, tac_var = convert mexp.exp_kind (fresh_var()) in
       output_tac fout tac_instructions;
       fprintf fout "return %s\n" (tac_expr_to_name tac_var)
     | _ -> fprintf fout ""
