@@ -29,6 +29,7 @@ type tac_instr =
   | TAC_Assign_FunctionCall of label * label * (tac_expr list) option
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
+  | TAC_Assign_Let of label * tac_expr list
 and arithop = 
   | Add  
   | Sub 
@@ -465,6 +466,26 @@ let main() = (
         (!retTacInstr @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
         [TAC_Assign_New(var, name)], TAC_Variable(var)
+      | Let(bindlist, let_body) ->
+        let retTacInstr = ref [] in
+        let let_vars = ref [] in
+        List.iter
+            (fun (Binding ((_, vname), (_, typename), binit)) ->
+              match binit with
+              (* [Let-Init] *)
+              | Some binit ->
+                let i, ta = convert binit.exp_kind (fresh_var()) in
+                retTacInstr := List.append !retTacInstr i;
+                let_vars := List.append !let_vars [ta]
+              (* [Let-No-Init] *)
+              | None -> 
+                let var = fresh_var () in
+                retTacInstr := List.append !retTacInstr [TAC_Assign_Default(var, typename)];
+                let_vars := List.append !let_vars [TAC_Variable(var)];
+              )
+            bindlist;
+        let i, ta = convert let_body.exp_kind var in
+        (!retTacInstr @ i), TAC_Variable(var)
       (* Need to finish rest of tac for objects and conditionals*)
       | _ -> [], TAC_Variable("None")
   )
@@ -508,6 +529,8 @@ let main() = (
         fprintf fout "\n";
       | TAC_Assign_New(var, name) ->
         fprintf fout "%s <- new %s\n" var name
+      | TAC_Assign_Default(var, name) ->
+        fprintf fout "%s <- default %s\n" var name;
       (* Need to finish the rest of assign statements for objects and conditional blocks*)
       | _ -> fprintf fout ""
 
