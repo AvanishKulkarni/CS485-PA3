@@ -418,6 +418,16 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind in
         let to_output = TAC_Assign_NullCheck(new_var, ta1) in
         (i1 @ [to_output]), (TAC_Variable(new_var))
+      | Block(exp) ->
+        let new_var = fresh_var () in
+        let retTacInstr = ref [] in
+        let lastTacVariable = ref (TAC_Variable("None")) in
+        List.iter( fun e ->
+          let i1, ta1 = convert e.exp_kind in
+          lastTacVariable := ta1;
+          retTacInstr := List.append !retTacInstr i1
+        ) exp;
+        (!retTacInstr), (TAC_Variable(new_var))
       (* Need to finish rest of tac for objects and conditionals*)
       | _ -> [], TAC_Variable("None")
   )

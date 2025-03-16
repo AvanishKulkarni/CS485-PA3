@@ -38,7 +38,7 @@ if [ -n "$1" ]; then
     echo "Our Output"
     ./main "$1-type"
     echo "Referenced Compiler"
-    cool --tac "$1"
+    cool --tac "$1" --out temp_ref
 else
     
     for file in cp1/*; do
