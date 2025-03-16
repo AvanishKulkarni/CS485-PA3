@@ -27,6 +27,8 @@ type tac_instr =
   | TAC_Assign_ObjectDefault of label * label
   | TAC_Assign_NullCheck of label * tac_expr
   | TAC_Assign_FunctionCall of label * label * (tac_expr list) option
+  | TAC_Assign_New of label * label
+  | TAC_Assign_Default of label * label
 and arithop = 
   | Add  
   | Sub 
@@ -461,6 +463,8 @@ let main() = (
         ) args;
         let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
         (!retTacInstr @ [to_output]), TAC_Variable(var)
+      | New((_, name)) ->
+        [TAC_Assign_New(var, name)], TAC_Variable(var)
       (* Need to finish rest of tac for objects and conditionals*)
       | _ -> [], TAC_Variable("None")
   )
@@ -502,6 +506,8 @@ let main() = (
         fprintf fout "%s <- call %s" var mname;
         List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
         fprintf fout "\n";
+      | TAC_Assign_New(var, name) ->
+        fprintf fout "%s <- new %s\n" var name
       (* Need to finish the rest of assign statements for objects and conditional blocks*)
       | _ -> fprintf fout ""
 
