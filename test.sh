@@ -42,11 +42,13 @@ if [ -n "$1" ]; then
 else
     
     for file in cp1/*; do
-        if run_tests $file; then
-            count=$((count + 1))
+        if [[ $file == *.cl ]]; then 
+            if run_tests $file; then
+                count=$((count + 1))
+            fi
+            total=$((total + 1))
+            echo ""
         fi
-        total=$((total + 1))
-        echo ""
     done
     echo "Passed $count/$total test cases"
 fi
