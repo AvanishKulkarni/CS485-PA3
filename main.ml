@@ -351,11 +351,19 @@ let main() = (
     varCount := !varCount +1;
     newVar
   ) in
+  let ident_tac : (name, (tac_expr)) Hashtbl.t = Hashtbl.create 255 in
   let rec convert (a: exp_kind) (var : name) : (tac_instr list * tac_expr) = (
     match a with
       | Identifier(v) -> 
         let _, name = v in
-        [TAC_Assign_Identifier(var, name)], TAC_Variable(var)
+        if Hashtbl.mem ident_tac name then (
+          let ta = Hashtbl.find ident_tac name in
+          [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
+        ) else (
+          Hashtbl.add ident_tac name (TAC_Variable(var));
+          [TAC_Assign_Identifier(var, name)], TAC_Variable(var)
+        );
+        
       | Integer(i) ->
         [TAC_Assign_Int(var, string_of_int i)], (TAC_Variable(var))
       | Bool(i) ->
@@ -476,15 +484,22 @@ let main() = (
               | Some binit ->
                 let i, ta = convert binit.exp_kind (fresh_var()) in
                 retTacInstr := List.append !retTacInstr i;
-                let_vars := List.append !let_vars [ta]
+                let_vars := List.append !let_vars [ta];
+                Hashtbl.add ident_tac vname (ta)
               (* [Let-No-Init] *)
               | None -> 
                 let var = fresh_var () in
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Default(var, typename)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
+                Hashtbl.add ident_tac vname (TAC_Variable(var))
               )
             bindlist;
         let i, ta = convert let_body.exp_kind var in
+        List.iter
+            (fun (Binding ((_, vname), (_, _), _)) ->
+              Hashtbl.remove ident_tac vname;
+              )
+            bindlist;
         (!retTacInstr @ i), TAC_Variable(var)
       (* Need to finish rest of tac for objects and conditionals*)
       | _ -> [], TAC_Variable("None")
