@@ -361,16 +361,13 @@ let main() = (
       | Identifier(v) -> 
         let _, name = v in
         printf "%s\n" name;
-        if Hashtbl.mem ident_tac name then (
-          let ta = Hashtbl.find ident_tac name in
-          varCount := !varCount -1;
+        (match Hashtbl.find_opt ident_tac name with 
+        | Some(ta) -> 
           printf "found -> returning %s\n" (tac_expr_to_name ta);
-          [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], ta
-        ) else (
-          printf "created\n";
+          [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
+        | None -> printf "created %s \n" name;
           Hashtbl.add ident_tac name (TAC_Variable(var));
-          [TAC_Assign_Identifier(var, name)], TAC_Variable(var)
-        );
+          [TAC_Assign_Identifier(var, name)], TAC_Variable(var))
       | Integer(i) ->
         [TAC_Assign_Int(var, string_of_int i)], (TAC_Variable(var))
       | Bool(i) ->
