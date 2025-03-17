@@ -360,7 +360,7 @@ let main() = (
     match a with
       | Identifier(v) -> 
         let _, name = v in
-        printf "%s\n" name;
+        (* printf "%s\n" name; *)
         (match Hashtbl.find_opt ident_tac name with 
         | Some(ta) -> 
           (* printf "found -> returning %s\n" (tac_expr_to_name ta); *)
