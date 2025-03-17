@@ -360,13 +360,14 @@ let main() = (
     match a with
       | Identifier(v) -> 
         let _, name = v in
-        if Hashtbl.mem ident_tac name then (
-          let ta = Hashtbl.find ident_tac name in
+        printf "%s\n" name;
+        (match Hashtbl.find_opt ident_tac name with 
+        | Some(ta) -> 
+          printf "found -> returning %s\n" (tac_expr_to_name ta);
           [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
-        ) else (
+        | None -> printf "created %s \n" name;
           Hashtbl.add ident_tac name (TAC_Variable(var));
-          [TAC_Assign_Identifier(var, name)], TAC_Variable(var)
-        );
+          [TAC_Assign_Identifier(var, name)], TAC_Variable(var))
       | Integer(i) ->
         [TAC_Assign_Int(var, string_of_int i)], (TAC_Variable(var))
       | Bool(i) ->
