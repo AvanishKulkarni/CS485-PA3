@@ -612,6 +612,7 @@ let main() = (
       | Method _ -> true 
       | _ -> false
       ) features in
+    (* Later add a check to see if a method was actually found *)
     match first_method with
     | Method((_, mname), _, _, mexp) ->
       fprintf fout "label %s_%s_0\n" cname mname;
