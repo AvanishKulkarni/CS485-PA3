@@ -447,7 +447,7 @@ let main() = (
         let i1, _ = convert last_statement.exp_kind var cname mname in
         retTacInstr := List.append !retTacInstr i1;
         (!retTacInstr), (TAC_Variable(var))
-      | Dynamic_Dispatch(_, (_, mname), args) ->
+      | Dynamic_Dispatch(caller, (_, mname), args) ->
         let retTacInstr = ref [] in
         let args_vars = ref [] in
         List.iter(fun a ->
@@ -455,8 +455,9 @@ let main() = (
           retTacInstr := List.append !retTacInstr i;
           args_vars := List.append !args_vars [ta]
         ) args;
+        let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
         let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
-        (!retTacInstr @ [to_output]), TAC_Variable(var)
+        (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | Self_Dispatch((_,mname), args) -> 
         let retTacInstr = ref [] in
         let args_vars = ref [] in
@@ -467,7 +468,7 @@ let main() = (
         ) args;
         let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
         (!retTacInstr @ [to_output]), TAC_Variable(var)
-      | Static_Dispatch(_, _, (_, mname), args) ->
+      | Static_Dispatch(caller, _, (_, mname), args) ->
         let retTacInstr = ref [] in
         let args_vars = ref [] in
         List.iter(fun a ->
@@ -475,8 +476,9 @@ let main() = (
           retTacInstr := List.append !retTacInstr i;
           args_vars := List.append !args_vars [ta]
         ) args;
+        let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
         let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
-        (!retTacInstr @ [to_output]), TAC_Variable(var)
+        (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
