@@ -363,9 +363,10 @@ let main() = (
         printf "%s\n" name;
         (match Hashtbl.find_opt ident_tac name with 
         | Some(ta) -> 
-          printf "found -> returning %s\n" (tac_expr_to_name ta);
+          (* printf "found -> returning %s\n" (tac_expr_to_name ta); *)
           [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
-        | None -> printf "created %s \n" name;
+        | None -> 
+          (* printf "created %s \n" name; *)
           Hashtbl.add ident_tac name (TAC_Variable(var));
           [TAC_Assign_Identifier(var, name)], TAC_Variable(var))
       | Integer(i) ->
