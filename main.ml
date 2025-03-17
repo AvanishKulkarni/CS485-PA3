@@ -360,10 +360,14 @@ let main() = (
     match a with
       | Identifier(v) -> 
         let _, name = v in
+        printf "%s\n" name;
         if Hashtbl.mem ident_tac name then (
           let ta = Hashtbl.find ident_tac name in
-          [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
+          varCount := !varCount -1;
+          printf "found -> returning %s\n" (tac_expr_to_name ta);
+          [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], ta
         ) else (
+          printf "created\n";
           Hashtbl.add ident_tac name (TAC_Variable(var));
           [TAC_Assign_Identifier(var, name)], TAC_Variable(var)
         );
@@ -485,16 +489,19 @@ let main() = (
               match binit with
               (* [Let-Init] *)
               | Some binit ->
-                let i, ta = convert binit.exp_kind (fresh_var()) cname mname in
+                let var = fresh_var () in
+                Hashtbl.add ident_tac vname (TAC_Variable(var));
+                let i, ta = convert binit.exp_kind (var) cname mname in
                 retTacInstr := List.append !retTacInstr i;
                 let_vars := List.append !let_vars [ta];
-                Hashtbl.add ident_tac vname (ta)
+                (* Hashtbl.add ident_tac vname (ta) *)
               (* [Let-No-Init] *)
               | None -> 
                 let var = fresh_var () in
+                Hashtbl.add ident_tac vname (TAC_Variable(var));
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Default(var, typename)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
-                Hashtbl.add ident_tac vname (TAC_Variable(var))
+                (* Hashtbl.add ident_tac vname (TAC_Variable(var)) *)
               )
             bindlist;
         let i, ta = convert let_body.exp_kind var cname mname in
@@ -505,10 +512,11 @@ let main() = (
             bindlist;
         (!retTacInstr @ i), TAC_Variable(var)
       | Assign((_, name), exp) ->
-        Hashtbl.add ident_tac name (TAC_Variable(name));
-        let i, ta = convert exp.exp_kind name cname mname in
-        let to_output = TAC_Assign_Assign(var, ta) in
-        (i @ [to_output]), (TAC_Variable(name))
+        let tac_var = Hashtbl.find ident_tac name in
+        (* Hashtbl.add ident_tac name (TAC_Variable(var)); *)
+        let i, ta = convert exp.exp_kind (fresh_var ())cname mname in
+        let to_output = TAC_Assign_Assign((tac_expr_to_name tac_var), ta) in
+        (i @ [to_output]), (tac_var)
       (* Need to finish rest of tac for objects and conditionals*)
       | If (pred, astthen, astelse) -> 
         let thenvar = fresh_var () in 
