@@ -532,8 +532,24 @@ let main() = (
 
         pinstr @ [notc] @ [be] @ [bt] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
+        let predvar = fresh_var() in 
+        let predlblname = fresh_label cname mname in 
+        let predlbl = TAC_Label(predlblname) in
+        let notpredvar = fresh_var () in 
 
-        [], TAC_Variable(var)
+        let exitlblname = fresh_label cname mname in 
+        let exitlbl = TAC_Label(exitlblname) in
+
+        let pinstr, pexp = convert pred.exp_kind predvar cname mname in 
+        let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in 
+        
+        let bexit = TAC_Branch_True(notpredvar, exitlblname) in 
+
+        let jpred = TAC_Jump(predlblname) in 
+
+        let binstr, bexp = convert astbody.exp_kind var cname mname in 
+
+        [predlbl] @ pinstr @ [notpred] @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -612,7 +628,6 @@ let main() = (
       | Method _ -> true 
       | _ -> false
       ) features in
-    (* Later add a check to see if a method was actually found *)
     match first_method with
     | Method((_, mname), _, _, mexp) ->
       fprintf fout "label %s_%s_0\n" cname mname;

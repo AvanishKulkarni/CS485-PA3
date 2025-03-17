@@ -1,7 +1,10 @@
-class Main {
+class Main inherits IO {
     main() : Object {
-        while true loop {
-            1;
-        } pool
+        let x : Int <- 2 in {
+            while 0 < x loop {
+                out_string("hello\n");
+                x <- x - 1;
+            } pool;
+        }
     };
 };
