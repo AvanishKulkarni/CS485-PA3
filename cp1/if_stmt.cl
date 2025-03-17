@@ -7,11 +7,11 @@ class Main {
             2;
         } fi;
         
-        let y : Bool <- true in 
-        if y then {
-            1;
-        } else {
-            2;
-        } fi;
+        -- let y : Bool <- true in 
+        -- if y then {
+        --     1;
+        -- } else {
+        --     2;
+        -- } fi;
     }};
 };

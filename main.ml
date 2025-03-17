@@ -36,6 +36,7 @@ type tac_instr =
   | TAC_Label of label
   | TAC_Jump of label
   | TAC_Return of label
+  | TAC_Internal of label 
 and tac_expr =
   | TAC_Variable of label
 and label = string
@@ -532,27 +533,7 @@ let main() = (
         pinstr @ [notc] @ [be] @ [bt] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
 
-        let predvar = fresh_var () in
-        let joinvar = fresh_var () in 
-        let falsevar = fresh_var () in 
-
-        let whilepred = fresh_label cname mname in (* Main_main_1 *)
-        let whilejoin = fresh_label cname mname in (* Main_main_2 *)
-        let truelbl = fresh_label cname mname in (* Main_main_3 *)
-
-        let predjmp = TAC_Jump(whilepred) in 
-        let pcomm = TAC_Comment("while-pred") in 
-        let plbl = TAC_Label(whilepred) in 
-        let pinstr, pexp = convert pred.exp_kind (predvar) cname mname in 
-        let notp = TAC_Assign_BoolNegate(falsevar, pexp) in 
-
-        let bf = TAC_Branch_True(falsevar, whilejoin) in 
-        let bt = TAC_Branch_True(predvar, truelbl) in 
-
-        let jcomm = TAC_Comment("while-join") in 
-        let jlbl = TAC_Label(whilejoin) in 
-
-        [predjmp] @ [pcomm] @ [plbl] @ pinstr @ [notp] @ [bf] @ [bt] @ [jcomm] @ [jlbl], TAC_Variable(var)
+        [], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -609,7 +590,6 @@ let main() = (
         fprintf fout "label %s\n" label
       | TAC_Return(label) ->
         fprintf fout "ret %s\n" label
-      (* Need to finish the rest of assign statements for objects and conditional blocks*)
       | _ -> fprintf fout ""
 
     ) tac_instructions;
