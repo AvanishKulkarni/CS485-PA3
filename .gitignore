@@ -39,3 +39,5 @@ _opam/
 #testing files
 reference_error.txt
 test_error.txt
+reference_output.txt
+test_output.txt

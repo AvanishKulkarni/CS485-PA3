@@ -11,12 +11,22 @@ function run_tests() {
     rm -f cp1/*.cl-type
     rm -f reference_error.txt
     rm -f test_error.txt
+    rm -f reference_output.txt
+    rm -f test_output.txt
     cool --type "$1"
     ./main "$1-type" > test_error.txt
     cool "$1" --tac --out temp_ref > reference_error.txt
 
     if [ -f "temp_ref.cl-tac" ]; then
-        diff -b -B -w temp_ref.cl-tac "$1-tac" > /dev/null
+        if [ -f "$1-input" ]; then
+            cool temp_ref.cl-tac < "$1-input" > reference_output.txt
+            cool "$1-tac" < "$1-input" > test_output.txt
+        else
+            cool temp_ref.cl-tac > reference_output.txt
+            cool "$1-tac" > test_output.txt
+        fi
+        diff -b -B -w reference_output.txt test_output.txt > /dev/null
+        # diff -b -B -w temp_ref.cl-tac "$1-tac" > /dev/null
     else
         diff -b -B -w reference_error.txt test_error.txt > /dev/null
     fi
