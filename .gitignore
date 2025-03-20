@@ -1,5 +1,6 @@
-*.cl-tac
-*.cl-type
+*.cl-*
+*.dot
+*.s
 wip/*
 test.cl
 
@@ -41,3 +42,4 @@ reference_error.txt
 test_error.txt
 reference_output.txt
 test_output.txt
+test/*
