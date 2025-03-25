@@ -641,8 +641,16 @@ let main() = (
     (* output constructors for objects *)
     List.iteri (fun i (cname, _) -> (
       fprintf aout ".globl %s..new\n%s..new:\t\t\t## constructor for %s\n" cname cname cname;
+      
+      (* create activation record *)
       fprintf aout "\tpushq %%rbp\n"; (* increment sp to instantiate new class onto stack *)
       fprintf aout "\tmovq %%rsp, %%rbp\n"; (* preserve sp reference as fp *)
+
+      (* create space for return, parameters *)
+      fprintf aout "\tmovq $0, -8(%%rbp)"; (* return address *)
+      fprintf aout ""; (* constructor has no parameters *)
+      (* pointer to previous record in stack *)
+
       fprintf aout "\t## store class tag (int), object size, vtable pointer\n";
 
       calloc aout "%%r8" 3 8; (* allocate memory *)
@@ -651,8 +659,10 @@ let main() = (
       fprintf aout "\tmovq $3, 8(%%r8)\n"; (* size *)
       fprintf aout "\tmovq %s, 16(%%r8)\n" (cname ^ "..vtable"); (* vtable pointer *)
 
-      fprintf aout "\tmovq %%rbp, %%rsp\n"; (* restore *)
-      fprintf aout "\tpopq %%rbp\n"; 
+      (* object is allocated *)
+
+      fprintf aout "\tmovq %%rbp, %%rsp\n"; (* restore stack pointer *)
+      fprintf aout "\tpopq %%rbp\n"; (* pop stack *)
       fprintf aout "\tret\n"
     )) impl_map;
 
