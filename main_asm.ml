@@ -619,7 +619,15 @@ let main() = (
   let asmname = Filename.chop_extension fname ^ ".s" in 
   let fout = open_out cltname in
   let aout = open_out asmname in 
+  let calloc fout register nmemb msize = (
+    fprintf fout "\tmovq $%d, %%rdi\n" nmemb;
+    fprintf fout "\tmovq $%d, %%rsi\n" msize;
+    fprintf fout "\tcall calloc\n";
+    fprintf fout "\tmovq %%rax, %s\n" register;
+  ) in
+
   let _, impl_map, _, ast = cltype in (
+
     (* output vtables from impl_map *)
     List.iteri (fun i (cname, methods) -> (
       fprintf aout ".globl %s..vtable\n%s..vtable:\n" cname cname;
@@ -631,6 +639,23 @@ let main() = (
     )) impl_map;
 
     (* output constructors for objects *)
+    List.iteri (fun i (cname, _) -> (
+      fprintf aout ".globl %s..new\n%s..new:\t\t\t## constructor for %s\n" cname cname cname;
+      fprintf aout "\tpushq %%rbp\n"; (* increment sp to instantiate new class onto stack *)
+      fprintf aout "\tmovq %%rsp, %%rbp\n"; (* preserve sp reference as fp *)
+      fprintf aout "\t## store class tag (int), object size, vtable pointer\n";
+
+      calloc aout "%%r8" 3 8; (* allocate memory *)
+
+      fprintf aout "\tmovq $%d, 0(%%r8)\n" i; (* class tag *)
+      fprintf aout "\tmovq $3, 8(%%r8)\n"; (* size *)
+      fprintf aout "\tmovq %s, 16(%%r8)\n" (cname ^ "..vtable"); (* vtable pointer *)
+
+      fprintf aout "\tmovq %%rbp, %%rsp\n"; (* restore *)
+      fprintf aout "\tpopq %%rbp\n"; 
+      fprintf aout "\tret\n"
+    )) impl_map;
+
 
     (* given the AST, convert it to a tac instruction *)
     fprintf fout "comment start\n";
