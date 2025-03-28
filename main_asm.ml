@@ -613,6 +613,65 @@ let main() = (
       | _ -> fprintf fout ""
 
     ) tac_instructions;
+  ) in
+
+  (* convert TAC instructions into asm *)
+  let tac_to_asm fout tac_instructions = (
+    List.iter ( fun x ->
+      match x with
+      | TAC_Assign_Identifier(var, i) ->
+        fprintf fout "%s <- %s\n" var i
+      | TAC_Assign_Int(var, i) ->
+        fprintf fout "%s <- int %s\n" var i
+      | TAC_Assign_Bool(var, i) ->
+        fprintf fout "%s <- bool %s\n" var i
+      | TAC_Assign_String(var, i) ->
+        fprintf fout "%s <- string\n%s\n" var i
+      | TAC_Assign_Plus(var, i1, i2) ->
+        fprintf fout "%s <- + %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Minus(var, i1, i2) ->
+        fprintf fout "%s <- - %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Times(var, i1, i2) ->
+        fprintf fout "%s <- * %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Div(var, i1, i2) ->
+        fprintf fout "%s <- / %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Lt(var, i1, i2) ->
+        fprintf fout "%s <- < %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Le(var, i1, i2) ->
+        fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Eq(var, i1, i2) ->
+        fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_ArithNegate(var, i) ->
+        fprintf fout "%s <- ~ %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_BoolNegate(var, i) ->
+        fprintf fout "%s <- not %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_NullCheck(var, i) ->
+        fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_FunctionCall(var, mname, None) ->
+        fprintf fout "%s <- call %s\n" var mname;
+      | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
+        fprintf fout "%s <- call %s" var mname;
+        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+        fprintf fout "\n";
+      | TAC_Assign_New(var, name) ->
+        fprintf fout "%s <- new %s\n" var name
+      | TAC_Assign_Default(var, name) ->
+        fprintf fout "%s <- default %s\n" var name;
+      | TAC_Assign_Assign(var, i) ->
+        fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
+      | TAC_Branch_True(cond, label) -> 
+        fprintf fout "bt %s %s\n" cond label; 
+      | TAC_Comment(comment) ->
+        fprintf fout "comment %s\n" comment;
+      | TAC_Jump(label) -> 
+        fprintf fout "jmp %s\n" label;
+      | TAC_Label(label) ->
+        fprintf fout "label %s\n" label
+      | TAC_Return(label) ->
+        fprintf fout "ret %s\n" label
+      | _ -> fprintf fout ""
+
+    ) tac_instructions;
   )
   in
   let cltname = Filename.chop_extension fname ^ ".cl-tac" in
@@ -666,6 +725,26 @@ let main() = (
       fprintf aout "\tret\n"
     )) impl_map;
 
+    (* output methods for non-default classes *)
+    let new_impl_map = List.filter (
+      fun (x, _) -> not (List.mem x ["Object"; "IO"; "Int"; "String"; "Bool"])
+    ) impl_map in 
+    List.iteri (fun cid (cname, methods) -> (
+      List.iteri (fun mid (mname, formals, _, _) -> (
+        fprintf aout "## method definition of %s.%s\n" cname mname;
+        fprintf aout ".globl %s.%s\n" cname mname;
+        fprintf aout "pushq %%rbp\nmoveq %%rsp, %%rbp\n";
+
+        (* allocate formals onto stack *)
+        let nformals = List.length(formals) in 
+        fprintf aout "## stack room for formals: %d\n" nformals;
+        fprintf aout "subq %d, %%rsp\n" (nformals * 8);
+
+        (* TODO find the AST for the method and then run it *)
+
+        fprintf aout "movq %%rbp, %%rsp\npopq %%rbp\nret\n";
+      )) methods;
+    )) new_impl_map;
 
     (* given the AST, convert it to a tac instruction *)
     fprintf fout "comment start\n";
