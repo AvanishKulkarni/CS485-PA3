@@ -7,7 +7,11 @@ int f(int x) {
 int main() {
   int b;
 
-  b = f(5);
+  b = 5;
 
-  return 0;
+  int a;
+
+  a = 10;
+
+  return a + b;
 }

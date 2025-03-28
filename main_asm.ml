@@ -623,7 +623,7 @@ let main() = (
     fprintf fout "\tmovq $%d, %%rdi\n" nmemb;
     fprintf fout "\tmovq $%d, %%rsi\n" msize;
     fprintf fout "\tcall calloc\n";
-    fprintf fout "\tmovq %%rax, %s\n" register;
+    fprintf fout "\tmovq %%rax, %%r12\n";
   ) in
 
   let _, impl_map, _, ast = cltype in (
@@ -653,11 +653,11 @@ let main() = (
 
       fprintf aout "\t## store class tag (int), object size, vtable pointer\n";
 
-      calloc aout "%%r8" 3 8; (* allocate memory *)
+      calloc aout "r12" 3 8; (* allocate memory *)
 
-      fprintf aout "\tmovq $%d, 0(%%r8)\n" i; (* class tag *)
-      fprintf aout "\tmovq $3, 8(%%r8)\n"; (* size *)
-      fprintf aout "\tmovq %s, 16(%%r8)\n" (cname ^ "..vtable"); (* vtable pointer *)
+      fprintf aout "\tmovq $%d, 0(%%r12)\n" i; (* class tag *)
+      fprintf aout "\tmovq $3, 8(%%r12)\n"; (* size *)
+      fprintf aout "\tmovq %s, 16(%%r12)\n" ("$" ^ cname ^ "..vtable"); (* vtable pointer *)
 
       (* object is allocated *)
 
