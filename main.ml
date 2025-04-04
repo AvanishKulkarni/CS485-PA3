@@ -675,7 +675,7 @@ let main() = (
   )
   in
   let cltname = Filename.chop_extension fname ^ ".cl-tac" in
-  let asmname = Filename.chop_extension fname ^ ".s" in 
+  let asmname = "file.s" in 
   let fout = open_out cltname in
   let aout = open_out asmname in 
   let print_calloc fout nmemb msize = (

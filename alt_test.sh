@@ -1,5 +1,5 @@
 #!/bin/bash
-if [ main_asm.ml -nt main ]; then
+if [ main.ml -nt main ]; then
     ocamlopt main.ml -o main 
 fi
 
@@ -8,4 +8,5 @@ fname="${input%.*}"
 
 cool --type "$fname.cl"
 ./main "$fname.cl-type"
-gcc "$fname.s" --static --no-pie 
+gcc "file.s" --static --no-pie 
+./a.out
