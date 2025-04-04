@@ -43,13 +43,7 @@ and label = string
 and iconst = string
 and bconst = string 
 and sconst = string
-and cfg_node = {
-  label: tac_instr;
-  comment: tac_instr;
-  mutable blocks: tac_instr list;
-  mutable true_branch: cfg_node option;
-  mutable false_branch: cfg_node option;
-}
+
 let tac_expr_to_name t = match t with TAC_Variable c -> c
 
 type static_type =
@@ -142,10 +136,6 @@ let main() = (
     | _ -> failwith "attr read failed in read_class_map"
   in (aname, atype, aexp)
   )
-  (* TODO: implement reading output expressions from PA2 *)
-(*   and read_exp () = (
-
-  ) *)
   and read_impl_map () = (
     let _ = read () in (* read "implementation_map" *)
     let classes = read_list read_class_imp_map
@@ -362,23 +352,6 @@ let main() = (
       newLabel
   ) in
   let ident_tac : (name, (tac_expr)) Hashtbl.t = Hashtbl.create 255 in
-  let currNode : cfg_node ref = ref {
-    label = TAC_Label("");
-    comment = TAC_Comment("");
-    blocks = [];
-    true_branch = None;
-    false_branch = None;
-  } in
-  let rec merge_node curr_node = (
-    match curr_node with
-    | Some(curr_node) -> (
-      match curr_node.true_branch with
-      | None -> curr_node.true_branch <- Some(!currNode);
-      | Some(node_branch) -> merge_node (Some(node_branch));
-    )
-    | None -> ();
-  )
-    in
   let rec convert (a: exp_kind) (var : name) (cname: name) (mname: name) : (tac_instr list * tac_expr) = (
     match a with
       | Identifier(v) -> 
@@ -387,21 +360,16 @@ let main() = (
         (match Hashtbl.find_opt ident_tac name with 
         | Some(ta) -> 
           (* printf "found -> returning %s\n" (tac_expr_to_name ta); *)
-          !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, (tac_expr_to_name ta))];
           [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
         | None -> 
           (* printf "created %s \n" name; *)
           Hashtbl.add ident_tac name (TAC_Variable(var));
-          !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, name)];
           [TAC_Assign_Identifier(var, name)], TAC_Variable(var))
       | Integer(i) ->
-        !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Int(var, string_of_int i)];
         [TAC_Assign_Int(var, string_of_int i)], (TAC_Variable(var))
       | Bool(i) ->
-        !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Bool(var, i)];
         [TAC_Assign_Bool(var, i)], (TAC_Variable(var))
       | String(i) ->
-        !currNode.blocks <- !currNode.blocks @ [TAC_Assign_String(var, i)];
         [TAC_Assign_String(var, i)], (TAC_Variable(var))
       | Plus(a1, a2) ->
         let arg1 = fresh_var () in
@@ -409,7 +377,6 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Plus(var, ta1, ta2) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Minus(a1, a2) ->
         let arg1 = fresh_var () in
@@ -417,7 +384,6 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Minus(var, ta1, ta2) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Times(a1, a2) -> 
         let arg1 = fresh_var () in
@@ -425,7 +391,6 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Times(var, ta1, ta2) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Divide(a1, a2) -> 
         let arg1 = fresh_var () in
@@ -433,7 +398,6 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Div(var, ta1, ta2) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Lt(a1, a2) ->
         let arg1 = fresh_var () in
@@ -441,7 +405,6 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Lt(var, ta1, ta2) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Le(a1, a2) ->
         let arg1 = fresh_var () in
@@ -449,7 +412,6 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Le(var, ta1, ta2) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Eq(a1, a2) ->
         let arg1 = fresh_var () in
@@ -457,22 +419,18 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Eq(var, ta1, ta2) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Not(a1) ->
         let i1, ta1 = convert a1.exp_kind (fresh_var()) cname mname in
         let to_output = TAC_Assign_BoolNegate(var, ta1) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ [to_output]), (TAC_Variable(var))
       | Negate(a1) ->
         let i1, ta1 = convert a1.exp_kind (fresh_var()) cname mname in
         let to_output = TAC_Assign_ArithNegate(var, ta1) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ [to_output]), (TAC_Variable(var))
       | Isvoid(a1) ->
         let i1, ta1 = convert a1.exp_kind (fresh_var()) cname mname in
         let to_output = TAC_Assign_NullCheck(var, ta1) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ [to_output]), (TAC_Variable(var))
       | Block(exp) ->
         let retTacInstr = ref [] in
@@ -505,7 +463,6 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ [to_output]), TAC_Variable(var)
       | Static_Dispatch(caller, _, (_, mname), args) ->
         let retTacInstr = ref [] in
@@ -519,7 +476,6 @@ let main() = (
         let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
-        !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
         let retTacInstr = ref [] in
@@ -540,7 +496,6 @@ let main() = (
                 let var = fresh_var () in
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Default(var, typename)];
-                !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Default(var, typename)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
                 (* Hashtbl.add ident_tac vname (TAC_Variable(var)) *)
               )
@@ -557,7 +512,6 @@ let main() = (
         (* Hashtbl.add ident_tac name (TAC_Variable(var)); *)
         let i, ta = convert exp.exp_kind (fresh_var ())cname mname in
         let to_output = TAC_Assign_Assign((tac_expr_to_name tac_var), ta) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i @ [to_output]), (tac_var)
       (* Need to finish rest of tac for objects and conditionals*)
       | If (pred, astthen, astelse) -> 
@@ -577,40 +531,9 @@ let main() = (
         let jcomm = TAC_Comment("if-join") in 
         let jlbl = TAC_Label(joinlbl) in 
         let jjmp = TAC_Jump(joinlbl) in 
-        !currNode.blocks <- !currNode.blocks @ [notc] @ [be] @ [bt];
-        let prevNode : cfg_node = !currNode in
-        (* true node*)
-        currNode := {
-          label = tlbl;
-          comment = tcomm;
-          blocks = [];
-          true_branch = None;
-          false_branch = None;
-        };
         let tinstr, texp = convert astthen.exp_kind (var) cname mname in 
-        !currNode.blocks <- !currNode.blocks @ [jjmp];
-        prevNode.true_branch <- Some(!currNode);
-        (* false node *)
-        currNode := {
-          label = elbl;
-          comment = ecomm;
-          blocks = [];
-          true_branch = None;
-          false_branch = None;
-        };
         let einstr, eexp = convert astelse.exp_kind (var) cname mname in 
-        !currNode.blocks <- !currNode.blocks @ [jjmp];
-        prevNode.false_branch <- Some(!currNode);
-        (* merge node *)
-        currNode := {
-          label = jlbl;
-          comment = jcomm;
-          blocks = [];
-          true_branch = None;
-          false_branch = None;
-        };
-        (* merge_node (prevNode.true_branch); *)
-        merge_node (prevNode.false_branch);
+
         pinstr @ [notc] @ [be] @ [bt] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
         let predvar = fresh_var() in 
@@ -634,8 +557,9 @@ let main() = (
       | _ -> [], TAC_Variable("None")
   )
   in
-  let output_tac_helper fout tac_instructions = (
-      match tac_instructions with
+  let output_tac fout tac_instructions = (
+    List.iter ( fun x ->
+      match x with
       | TAC_Assign_Identifier(var, i) ->
         fprintf fout "%s <- %s\n" var i
       | TAC_Assign_Int(var, i) ->
@@ -688,31 +612,224 @@ let main() = (
         fprintf fout "ret %s\n" label
       | _ -> fprintf fout ""
 
-    
-  )
-  in
-  let visitedNodes = ref [] in
-  let rec output_tac fout cfgNode = (
-    match cfgNode with
-    | None -> ();
-    | Some(cfgNode) -> 
-      if not(List.mem cfgNode.label !visitedNodes) then (
-        visitedNodes :=  cfgNode.label :: !visitedNodes;
-        output_tac_helper fout cfgNode.comment;
-        output_tac_helper fout cfgNode.label;
-        List.iter ( fun x ->
-          output_tac_helper fout x;
-        ) cfgNode.blocks;
-        output_tac fout cfgNode.true_branch;
-        output_tac fout cfgNode.false_branch;
-      )
+    ) tac_instructions;
+  ) in
+
+  (* convert TAC instructions into asm *)
+  let tac_to_asm fout tac_instructions = (
+    List.iter ( fun x ->
+      match x with
+      | TAC_Assign_Identifier(var, i) ->
+        fprintf fout "%s <- %s\n" var i
+      | TAC_Assign_Int(var, i) ->
+        fprintf fout "%s <- int %s\n" var i
+      | TAC_Assign_Bool(var, i) ->
+        fprintf fout "%s <- bool %s\n" var i
+      | TAC_Assign_String(var, i) ->
+        fprintf fout "%s <- string\n%s\n" var i
+      | TAC_Assign_Plus(var, i1, i2) ->
+        fprintf fout "%s <- + %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Minus(var, i1, i2) ->
+        fprintf fout "%s <- - %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Times(var, i1, i2) ->
+        fprintf fout "%s <- * %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Div(var, i1, i2) ->
+        fprintf fout "%s <- / %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Lt(var, i1, i2) ->
+        fprintf fout "%s <- < %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Le(var, i1, i2) ->
+        fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Eq(var, i1, i2) ->
+        fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_ArithNegate(var, i) ->
+        fprintf fout "%s <- ~ %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_BoolNegate(var, i) ->
+        fprintf fout "%s <- not %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_NullCheck(var, i) ->
+        fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_FunctionCall(var, mname, None) ->
+        fprintf fout "%s <- call %s\n" var mname;
+      | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
+        fprintf fout "%s <- call %s" var mname;
+        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+        fprintf fout "\n";
+      | TAC_Assign_New(var, name) ->
+        fprintf fout "%s <- new %s\n" var name
+      | TAC_Assign_Default(var, name) ->
+        fprintf fout "%s <- default %s\n" var name;
+      | TAC_Assign_Assign(var, i) ->
+        fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
+      | TAC_Branch_True(cond, label) -> 
+        fprintf fout "bt %s %s\n" cond label; 
+      | TAC_Comment(comment) ->
+        fprintf fout "comment %s\n" comment;
+      | TAC_Jump(label) -> 
+        fprintf fout "jmp %s\n" label;
+      | TAC_Label(label) ->
+        fprintf fout "label %s\n" label
+      | TAC_Return(label) ->
+        fprintf fout "ret %s\n" label
+      | _ -> fprintf fout ""
+
+    ) tac_instructions;
   )
   in
   let cltname = Filename.chop_extension fname ^ ".cl-tac" in
+  let asmname = Filename.chop_extension fname ^ ".s" in 
   let fout = open_out cltname in
-  let _, _, _, ast = cltype in (
+  let aout = open_out asmname in 
+  let print_calloc fout nmemb msize = (
+    fprintf fout "\tmovq $%d, %%rdi\n" nmemb;
+    fprintf fout "\tmovq $%d, %%rsi\n" msize;
+    fprintf fout "\tcall calloc\n";
+    fprintf fout "\tmovq %%rax, %%r12\n";
+  ) in
+  let print_asm_string fout sname content = (
+    fprintf fout ".globl %s\n" sname;
+    fprintf fout "%s:\t" sname;
+    fprintf fout "## \"%s\"\n" content;
+    String.iter(fun c -> (
+      fprintf aout ".byte %3d # %c\n" (Char.code c) c;
+    )) content;
+    fprintf fout ".byte 0\n\n" (* null terminator *)
+  ) in 
+
+
+  let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 in
+  
+  let class_map, impl_map, _, ast = cltype in (
+
+    (* output vtables from impl_map *)
+    List.iteri (fun i (cname, methods) -> (
+      fprintf aout ".globl %s..vtable\n%s..vtable:\n" cname cname;
+      fprintf aout "\t.quad string%d\n" i; (* name *)
+      Hashtbl.add asm_strings cname ("string"^(string_of_int i));
+      fprintf aout "\t.quad %s..new\n" cname; (* constructor *)
+      List.iter (fun (mname, _, defclass, _) -> (
+        fprintf aout "\t.quad %s.%s\n" defclass mname;
+      )) methods
+    )) impl_map;
+
+    (* output constructors for objects *)
+    List.iteri (fun i (cname, attrs) -> (
+      fprintf aout ".globl %s..new\n%s..new:\t\t\t## constructor for %s\n" cname cname cname;
+      
+      (* create activation record *)
+      fprintf aout "\tpushq %%rbp\n"; 
+      fprintf aout "\tmovq %%rsp, %%rbp\n"; 
+
+      (* allocate for class tag, obj size, vtable, attrs *)
+      let attrs_ct = List.length(attrs) in 
+      let obj_size = attrs_ct + 3 in
+      print_calloc aout obj_size 8;
+
+      fprintf aout "\tmovq $%d, 0(%%r12)\n" i; (* class tag *)
+
+      fprintf aout "\tmovq $%d, 8(%%r12)\n" obj_size; 
+      fprintf aout "\tmovq $%s..vtable, 16(%%r12)\n" cname;
+
+      (* init attributes -- override for internal methods *)
+      (match cname with 
+      | "Bool" | "Int" -> 
+        fprintf aout "\tmovq $0, 24(%%r12)\n";
+      | "String" -> 
+        fprintf aout "\tmovq $the.empty.string, 24(%%r12)\n";
+      | "Object" | "IO" -> 
+        fprintf aout "";
+      | _ -> (
+        List.iteri (fun i (aname, atype, _) -> (
+          (* TODO: Impl Later *)
+        )) attrs;
+      )
+      );
+      fprintf aout "\tmovq %%rbp, %%rsp\n"; 
+      fprintf aout "\tpopq %%rbp\n"; 
+      fprintf aout "\tret\n"
+    )) class_map;
+
+    (* output methods for non-default classes *)
+    fprintf aout "\n## USER METHOD BODIES BEGINS\n\n";
+
+    let user_impl_map = List.filter (
+      fun (x, _) -> not (List.mem x ["Object"; "IO"; "Int"; "String"; "Bool"])
+    ) impl_map in 
+    List.iteri (fun cid (cname, methods) -> (
+      let non_inherited_methods = List.filter ( 
+        fun (_, _, defname, _) -> cname = defname
+      ) methods
+      in
+      List.iteri (fun mid (mname, formals, _, _) -> (
+        fprintf aout "## method definition of %s.%s\n" cname mname;
+        fprintf aout ".globl %s.%s\n" cname mname;
+        fprintf aout "%s.%s:\n" cname mname;
+        fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+
+        (* allocate formals onto stack *)
+        let nformals = List.length(formals) in 
+        fprintf aout "\t## stack room for formals: %d\n" nformals;
+        fprintf aout "\tsubq %d, %%rsp\n" (nformals * 8);
+
+        (* TODO find the AST for the method and then run it *)
+
+        fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+      )) non_inherited_methods;
+    )) user_impl_map;
+
+    fprintf aout "\n## USER METHOD BODIES ENDS\n";
+    fprintf aout "\n## INTERNAL METHOD BODIES BEGINS\n\n";
+
+    (* output internal method bodies - copied from COOL reference compiler *)
+    let internal_impl_map = List.filter (
+      fun (x, _) -> List.mem x ["Object"; "IO"; "Int"; "String"; "Bool"]
+    ) impl_map in 
+    List.iteri (fun cid (cname, methods) -> (
+      let non_inherited_methods = List.filter ( 
+        fun (_, _, defname, _) -> cname = defname
+      ) methods
+      in
+      List.iteri (fun mid (mname, mformals, mdef, _) -> (
+        fprintf aout "## method definition of %s.%s\n" mdef mname;
+        fprintf aout ".globl %s.%s\n" cname mname;
+        fprintf aout "%s.%s:\n" cname mname;
+        fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+
+        match cname, mname with 
+        | ("Object", "abort") -> ();
+        | _ -> fprintf aout "\n## MISSING INTERNAL METHOD DEF for %s.%s\n\n" cname mname;
+
+        fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+      )) non_inherited_methods
+    )) internal_impl_map;
+
+    fprintf aout "\n## INTERNAL METHOD BODIES END\n";
+
+    (* print out string constants *)
+    Hashtbl.iter (fun cname sname -> (
+      print_asm_string aout sname cname
+    )) asm_strings;
+
+    print_asm_string aout "the.empty.string" "";
+
+
+    (* print out program start *)
+
+    fprintf aout "\n## PROGRAM BEGINS HERE\n";
+    fprintf aout ".globl start\nstart:\n\t.globl main\n\t.type main, @function\n";
+    fprintf aout "main:\n";
+    fprintf aout "
+movq $Main..new, %%r14
+pushq %%rbp
+call *%%r14
+pushq %%rbp
+pushq %%r13
+movq $Main.main, %%r14
+call *%%r14
+movl $0, %%edi
+call exit
+    ";
+
     (* given the AST, convert it to a tac instruction *)
-    (* fprintf fout "comment start\n"; *)
+    fprintf fout "comment start\n";
     let compare_ast (a : cool_class) (b : cool_class) : int = (
       let ((_, aname), _, _) = a in 
       let ((_, bname), _, _) = b in 
@@ -727,18 +844,9 @@ let main() = (
       ) features in
     match first_method with
     | Method((_, mname), _, _, mexp) ->
-      (* fprintf fout "label %s_%s_0\n" cname mname; *)
-      let node : cfg_node = {
-        label = TAC_Label((sprintf "%s_%s_0" cname mname));
-        comment = TAC_Comment("start");
-        blocks = [];
-        true_branch = None;
-        false_branch = None;
-      }
-      in
-      currNode := node;
+      fprintf fout "label %s_%s_0\n" cname mname;
       let tac_instructions, tac_var = convert mexp.exp_kind (fresh_var()) cname mname in
-      output_tac fout (Some(node));
+      output_tac fout tac_instructions;
       fprintf fout "return %s\n" (tac_expr_to_name tac_var)
     | _ -> fprintf fout ""
   )

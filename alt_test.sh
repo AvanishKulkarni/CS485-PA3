@@ -1,6 +1,6 @@
 #!/bin/bash
 if [ main_asm.ml -nt main ]; then
-    ocamlopt main_asm.ml -o main 
+    ocamlopt main.ml -o main 
 fi
 
 input=$1
