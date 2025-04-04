@@ -678,19 +678,32 @@ let main() = (
   let asmname = Filename.chop_extension fname ^ ".s" in 
   let fout = open_out cltname in
   let aout = open_out asmname in 
-  let calloc fout register nmemb msize = (
+  let print_calloc fout nmemb msize = (
     fprintf fout "\tmovq $%d, %%rdi\n" nmemb;
     fprintf fout "\tmovq $%d, %%rsi\n" msize;
     fprintf fout "\tcall calloc\n";
     fprintf fout "\tmovq %%rax, %%r12\n";
   ) in
+  let print_asm_string fout sname content = (
+    fprintf fout ".globl %s\n" sname;
+    fprintf fout "%s:\t" sname;
+    fprintf fout "## \"%s\"\n" content;
+    String.iter(fun c -> (
+      fprintf aout ".byte %3d # %c\n" (Char.code c) c;
+    )) content;
+    fprintf fout ".byte 0\n\n" (* null terminator *)
+  ) in 
 
-  let _, impl_map, _, ast = cltype in (
+
+  let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 in
+  
+  let class_map, impl_map, _, ast = cltype in (
 
     (* output vtables from impl_map *)
     List.iteri (fun i (cname, methods) -> (
       fprintf aout ".globl %s..vtable\n%s..vtable:\n" cname cname;
       fprintf aout "\t.quad string%d\n" i; (* name *)
+      Hashtbl.add asm_strings cname ("string"^(string_of_int i));
       fprintf aout "\t.quad %s..new\n" cname; (* constructor *)
       List.iter (fun (mname, _, defclass, _) -> (
         fprintf aout "\t.quad %s.%s\n" defclass mname;
@@ -698,53 +711,104 @@ let main() = (
     )) impl_map;
 
     (* output constructors for objects *)
-    List.iteri (fun i (cname, _) -> (
+    List.iteri (fun i (cname, attrs) -> (
       fprintf aout ".globl %s..new\n%s..new:\t\t\t## constructor for %s\n" cname cname cname;
       
       (* create activation record *)
-      fprintf aout "\tpushq %%rbp\n"; (* increment sp to instantiate new class onto stack *)
-      fprintf aout "\tmovq %%rsp, %%rbp\n"; (* preserve sp reference as fp *)
+      fprintf aout "\tpushq %%rbp\n"; 
+      fprintf aout "\tmovq %%rsp, %%rbp\n"; 
 
-      (* create space for return, parameters *)
-      fprintf aout "\tmovq $0, -8(%%rbp)"; (* return address *)
-      fprintf aout ""; (* constructor has no parameters *)
-      (* pointer to previous record in stack *)
-
-      fprintf aout "\t## store class tag (int), object size, vtable pointer\n";
-
-      calloc aout "r12" 3 8; (* allocate memory *)
+      (* allocate for class tag, obj size, vtable, attrs *)
+      let attrs_ct = List.length(attrs) in 
+      let obj_size = attrs_ct + 3 in
+      print_calloc aout obj_size 8;
 
       fprintf aout "\tmovq $%d, 0(%%r12)\n" i; (* class tag *)
-      fprintf aout "\tmovq $3, 8(%%r12)\n"; (* size *)
-      fprintf aout "\tmovq %s, 16(%%r12)\n" ("$" ^ cname ^ "..vtable"); (* vtable pointer *)
 
-      (* object is allocated *)
+      fprintf aout "\tmovq $%d, 8(%%r12)\n" obj_size; 
+      fprintf aout "\tmovq $%s..vtable, 16(%%r12)\n" cname;
 
-      fprintf aout "\tmovq %%rbp, %%rsp\n"; (* restore stack pointer *)
-      fprintf aout "\tpopq %%rbp\n"; (* pop stack *)
+      (* init attributes -- override for internal methods *)
+      (match cname with 
+      | "Bool" | "Int" -> 
+        fprintf aout "\tmovq $0, 24(%%r12)\n";
+      | "String" -> 
+        fprintf aout "\tmovq $the.empty.string, 24(%%r12)\n";
+      | "Object" | "IO" -> 
+        fprintf aout "";
+      | _ -> (
+        List.iteri (fun i (aname, atype, _) -> (
+          (* TODO: Impl Later *)
+        )) attrs;
+      )
+      );
+      fprintf aout "\tmovq %%rbp, %%rsp\n"; 
+      fprintf aout "\tpopq %%rbp\n"; 
       fprintf aout "\tret\n"
-    )) impl_map;
+    )) class_map;
 
     (* output methods for non-default classes *)
-    let new_impl_map = List.filter (
+    fprintf aout "\n## USER METHOD BODIES BEGINS\n\n";
+
+    let user_impl_map = List.filter (
       fun (x, _) -> not (List.mem x ["Object"; "IO"; "Int"; "String"; "Bool"])
     ) impl_map in 
     List.iteri (fun cid (cname, methods) -> (
+      let non_inherited_methods = List.filter ( 
+        fun (_, _, defname, _) -> cname = defname
+      ) methods
+      in
       List.iteri (fun mid (mname, formals, _, _) -> (
         fprintf aout "## method definition of %s.%s\n" cname mname;
         fprintf aout ".globl %s.%s\n" cname mname;
-        fprintf aout "pushq %%rbp\nmoveq %%rsp, %%rbp\n";
+        fprintf aout "%s.%s:\n" cname mname;
+        fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
 
         (* allocate formals onto stack *)
         let nformals = List.length(formals) in 
-        fprintf aout "## stack room for formals: %d\n" nformals;
-        fprintf aout "subq %d, %%rsp\n" (nformals * 8);
+        fprintf aout "\t## stack room for formals: %d\n" nformals;
+        fprintf aout "\tsubq %d, %%rsp\n" (nformals * 8);
 
         (* TODO find the AST for the method and then run it *)
 
-        fprintf aout "movq %%rbp, %%rsp\npopq %%rbp\nret\n";
-      )) methods;
-    )) new_impl_map;
+        fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+      )) non_inherited_methods;
+    )) user_impl_map;
+
+    fprintf aout "\n## USER METHOD BODIES ENDS\n";
+    fprintf aout "\n## INTERNAL METHOD BODIES BEGINS\n\n";
+
+    (* output internal method bodies - copied from COOL reference compiler *)
+    let internal_impl_map = List.filter (
+      fun (x, _) -> List.mem x ["Object"; "IO"; "Int"; "String"; "Bool"]
+    ) impl_map in 
+    List.iteri (fun cid (cname, methods) -> (
+      let non_inherited_methods = List.filter ( 
+        fun (_, _, defname, _) -> cname = defname
+      ) methods
+      in
+      List.iteri (fun mid (mname, mformals, mdef, _) -> (
+        fprintf aout "## method definition of %s.%s\n" mdef mname;
+        fprintf aout ".globl %s.%s\n" cname mname;
+        fprintf aout "%s.%s:\n" cname mname;
+        fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+
+        match cname, mname with 
+        | ("Object", "abort") -> ();
+        | _ -> fprintf aout "\n## MISSING INTERNAL METHOD DEF for %s.%s\n\n" cname mname;
+
+        fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+      )) non_inherited_methods
+    )) internal_impl_map;
+
+    fprintf aout "\n## INTERNAL METHOD BODIES END\n";
+
+    (* print out string constants *)
+    Hashtbl.iter (fun cname sname -> (
+      print_asm_string aout sname cname
+    )) asm_strings;
+
+    print_asm_string aout "the.empty.string" "";
 
     (* given the AST, convert it to a tac instruction *)
     fprintf fout "comment start\n";
