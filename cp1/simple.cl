@@ -1,5 +1,11 @@
 class Main inherits IO {
     main(): Object {
-        out_string("hello, world!\n")
+        let b : Int in {
+            let a : Int in {
+                b <- 2;
+                out_int(a + 5);
+                b+a;
+            };
+        }
     };
 };
