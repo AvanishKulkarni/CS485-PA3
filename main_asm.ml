@@ -810,6 +810,24 @@ let main() = (
 
     print_asm_string aout "the.empty.string" "";
 
+
+    (* print out program start *)
+
+    fprintf aout "\n## PROGRAM BEGINS HERE\n";
+    fprintf aout ".globl start\nstart:\n\t.globl main\n\t.type main, @function\n";
+    fprintf aout "main:\n";
+    fprintf aout "
+movq $Main..new, %%r14
+pushq %%rbp
+call *%%r14
+pushq %%rbp
+pushq %%r13
+movq $Main.main, %%r14
+call *%%r14
+movl $0, %%edi
+call exit
+    ";
+
     (* given the AST, convert it to a tac instruction *)
     fprintf fout "comment start\n";
     let compare_ast (a : cool_class) (b : cool_class) : int = (
