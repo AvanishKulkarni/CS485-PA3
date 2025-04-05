@@ -767,7 +767,7 @@ let main() = (
         (* allocate formals onto stack *)
         let nformals = List.length(formals) in 
         fprintf aout "\t## stack room for formals: %d\n" nformals;
-        fprintf aout "\tsubq %d, %%rsp\n" (nformals * 8);
+        fprintf aout "\tsubq $%d, %%rsp\n" (nformals * 8);
 
         (* TODO find the AST for the method and then run it *)
 
