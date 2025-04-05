@@ -557,6 +557,54 @@ let main() = (
       | _ -> [], TAC_Variable("None")
   )
   in
+  let rec numTemps (a: exp_kind) : int = (
+    match a with
+    | Identifier(v) -> 0
+    | Integer(i) -> 0
+    | Bool(i) -> 0
+    | String(i) -> 0
+    | Plus(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
+    | Minus(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
+    | Times(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
+    | Divide(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
+    | Lt(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
+    | Le(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
+    | Eq(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
+    | Not(a1) -> numTemps a1.exp_kind
+    | Negate(a1) -> numTemps a1.exp_kind
+    | Isvoid(a1) -> numTemps a1.exp_kind
+    | Block(exp) ->
+      List.fold_left (fun acc e ->
+        max acc (numTemps e.exp_kind)
+      ) 0 exp
+    | Dynamic_Dispatch(caller, (_, mname), args) -> 
+      max (numTemps caller.exp_kind) (
+      List.fold_left (fun acc e ->
+        max acc (numTemps e.exp_kind)
+      ) 0 args)
+    | Self_Dispatch((_,mname), args) -> 
+      List.fold_left (fun acc e ->
+        max acc (numTemps e.exp_kind)
+      ) 0 args
+    | Static_Dispatch(caller, _, (_, mname), args) -> 
+      max (numTemps caller.exp_kind) (
+      List.fold_left (fun acc e ->
+        max acc (numTemps e.exp_kind)
+      ) 0 args)
+    | New((_, name)) -> 0
+    | Let(bindlist, let_body) ->
+      (* assuming bindings need 0 temps since you can just modify the registers its saved at*)
+      numTemps let_body.exp_kind
+    | Assign((_, name), exp) -> 0 (* same as let *)
+    (* Need to finish rest of tac for objects and conditionals*)
+    | If (pred, astthen, astelse) -> 
+      let res = max (numTemps pred.exp_kind) (numTemps astthen.exp_kind) in
+      max res (numTemps astelse.exp_kind)
+    | While (pred, astbody) ->
+      max (numTemps pred.exp_kind) (numTemps astbody.exp_kind)
+    | _ -> 0
+  )
+  in
   let output_tac fout tac_instructions = (
     List.iter ( fun x ->
       match x with
@@ -758,16 +806,17 @@ let main() = (
         fun (_, _, defname, _) -> cname = defname
       ) methods
       in
-      List.iteri (fun mid (mname, formals, _, _) -> (
+      List.iteri (fun mid (mname, formals, _, body) -> (
         fprintf aout "## method definition of %s.%s\n" cname mname;
         fprintf aout ".globl %s.%s\n" cname mname;
         fprintf aout "%s.%s:\n" cname mname;
         fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
 
         (* allocate formals onto stack *)
-        let nformals = List.length(formals) in 
-        fprintf aout "\t## stack room for formals: %d\n" nformals;
-        fprintf aout "\tsubq $%d, %%rsp\n" (nformals * 8);
+        (* let nformals = List.length(formals) in  *)
+        let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
+        fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
+        fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 8);
 
         (* TODO find the AST for the method and then run it *)
 
