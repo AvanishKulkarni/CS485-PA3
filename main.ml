@@ -923,6 +923,127 @@ let main() = (
           fprintf aout "call cooloutstr\n";
           fprintf aout "mov %%r12, %%r13\n";
         )
+        | ("Object", "abort") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "movq $abort.string, %%rdi\n";
+          fprintf aout "call cooloutstr\n";
+          fprintf aout "movl $0, %%edi\n";
+          fprintf aout "call exit\n";
+        )
+        | ("Object", "copy") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "movq $8, %%rsi\n";
+          fprintf aout "movq 8(%%r12), %%r14\n";
+          fprintf aout "%%r14, %%rdi\n";
+          fprintf aout "call calloc\n";
+          fprintf aout "movq %%rax, %%r13\n";
+          fprintf aout "pushq %%r13\n";
+          fprintf aout "\n";
+
+          (* idk what this does, copied from ref compiler *)
+          fprintf aout "
+.globl l1
+l1:
+  cmpq $0, %%r14
+  je l2
+  movq 0(%%r12), %%r15
+  movq %%r15, 0(%%r13)
+  movq $8, %%r15
+  addq %%r15, %%r12
+  addq %%r15, %%r13
+  movq $1, %%r15
+  subq %%r15, %%r14
+  jmp l1
+.globl l2
+l2:                     ## done with Object.copy loop
+  popq %%r13
+";
+        )
+        | ("Object", "type_name") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "pushq %%rbp\n";
+          fprintf aout "pushq %%r12\n";
+          fprintf aout "movq $String..new, %%r14\n";
+          fprintf aout "call *%%r14\n";
+          fprintf aout "popq %%r12\n";
+          fprintf aout "popq %%rbp\n";
+          fprintf aout "movq 16(%%r12), %%r14\n";
+          fprintf aout "movq 0(%%r14), %%r14\n";
+          fprintf aout "movq %%r14, 24(%%r13)\n";
+        )
+        | ("String", "length") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "pushq %%rbp\n";
+          fprintf aout "pushq %%r12\n";
+          fprintf aout "movq $Int..new, %%r14\n";
+          fprintf aout "call *%%r14\n";
+          fprintf aout "popq %%r12\n";
+          fprintf aout "popq %%rbp\n";
+          fprintf aout "movq %%r13, %%r14\n";
+          fprintf aout "movq 24(%%r12) %%r13\n";
+          fprintf aout "movq %%r13, %%rdi\n";
+          fprintf aout "$0, %%eax\n";
+          fprintf aout "call coolstrlen\n";
+          fprintf aout "movq %%rax, %%r13\n";
+          fprintf aout "movq %%r13, 24(%%r14)\n";
+          fprintf aout "movq %%r14, %%r13\n";
+        )
+        | ("String", "concat") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "pushq %%rbp\n";
+          fprintf aout "pushq %%r12\n";
+          fprintf aout "movq $String..new, %%r14\n";
+          fprintf aout "call *%%r14\n";
+          fprintf aout "popq %%r12\n";
+          fprintf aout "popq %%rbp\n";
+          fprintf aout "movq %%r13, %%r15\n";
+          fprintf aout "movq 24(%%rbp), %%r14\n";
+          fprintf aout "movq 24(%%r14), %%r14\n";
+          fprintf aout "movq 24(%%r12), %%r13\n";
+          fprintf aout "movq %%r13, %%rdi\n";
+          fprintf aout "movq %%r14, %%rsi\n";
+          fprintf aout "call coolstrcat\n";
+          fprintf aout "movq %%rax, %%r13\n";
+          fprintf aout "movq %%r13, 24(%%r15)\n";
+          fprintf aout "movq %%r15, %%r13\n";
+        )
+        | ("String", "substr") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "pushq %%rbp\n";
+          fprintf aout "pushq %%r12\n";
+          fprintf aout "movq $String..new, %%r14\n";
+          fprintf aout "call *%%r14\n";
+          fprintf aout "popq %%r12\n";
+          fprintf aout "popq %%rbp\n";
+          fprintf aout "movq %%r13, %%r15\n";
+          fprintf aout "movq 24(%%rbp), %%r14\n";
+          fprintf aout "movq 24(%%r14), %%r14\n";
+          fprintf aout "movq 32(%%rbp), %%r13\n";
+          fprintf aout "movq 24(%%r13), %%r13\n";
+          fprintf aout "movq 24(%%r12), %%r12\n";
+          fprintf aout "movq %%r12, %%rdi\n";
+          fprintf aout "movq %%r13, %%rsi\n";
+          fprintf aout "movq %%r14, %%rdx\n";
+          fprintf aout "call coolsubstr\n";
+          fprintf aout "movq %%rax, %%r13\n";
+          fprintf aout "cmpq $0, %%r13\n";
+          fprintf aout "jne l3\n";
+          fprintf aout "movq $string8, %%r13\n";
+          fprintf aout "movq %%r13, %%rdi\n";
+          fprintf aout "call cooloutstr\n";
+          fprintf aout "movl $0, %%edi\n";
+          fprintf aout "call exit\n";
+          fprintf aout ".globl l3\n";
+          fprintf aout "l3:\n";
+          fprintf aout "movq %%r13, 24(%%r15)\n";
+          fprintf aout "movq %%r15, %%r13\n";
+        )
         | _ -> fprintf aout "\n## MISSING INTERNAL METHOD DEF for %s.%s\n\n" cname mname;
         );
 
