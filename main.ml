@@ -747,7 +747,8 @@ let main() = (
   
   Hashtbl.add asm_strings "%ld" "percent.d";
   Hashtbl.add asm_strings "" "the.empty.string";
-
+  Hashtbl.add asm_strings "ERROR: 0: Exception: String.substr out of range\\n" "substr.error.string";
+  Hashtbl.add asm_strings "abort\\n" "abort.string";
 
   let class_map, impl_map, _, ast = cltype in (
 
@@ -936,7 +937,7 @@ let main() = (
           fprintf aout "subq $8, %%rsp\n";
           fprintf aout "movq $8, %%rsi\n";
           fprintf aout "movq 8(%%r12), %%r14\n";
-          fprintf aout "%%r14, %%rdi\n";
+          fprintf aout "movq %%r14, %%rdi\n";
           fprintf aout "call calloc\n";
           fprintf aout "movq %%rax, %%r13\n";
           fprintf aout "pushq %%r13\n";
@@ -984,9 +985,9 @@ l2:                     ## done with Object.copy loop
           fprintf aout "popq %%r12\n";
           fprintf aout "popq %%rbp\n";
           fprintf aout "movq %%r13, %%r14\n";
-          fprintf aout "movq 24(%%r12) %%r13\n";
+          fprintf aout "movq 24(%%r12), %%r13\n";
           fprintf aout "movq %%r13, %%rdi\n";
-          fprintf aout "$0, %%eax\n";
+          fprintf aout "movl $0, %%eax\n";
           fprintf aout "call coolstrlen\n";
           fprintf aout "movq %%rax, %%r13\n";
           fprintf aout "movq %%r13, 24(%%r14)\n";
@@ -1034,7 +1035,7 @@ l2:                     ## done with Object.copy loop
           fprintf aout "movq %%rax, %%r13\n";
           fprintf aout "cmpq $0, %%r13\n";
           fprintf aout "jne l3\n";
-          fprintf aout "movq $string8, %%r13\n";
+          fprintf aout "movq $substr.error.string, %%r13\n";
           fprintf aout "movq %%r13, %%rdi\n";
           fprintf aout "call cooloutstr\n";
           fprintf aout "movl $0, %%edi\n";
