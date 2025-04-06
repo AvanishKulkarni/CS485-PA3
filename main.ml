@@ -745,12 +745,17 @@ let main() = (
 
   let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 in
   
+  Hashtbl.add asm_strings "%ld" "percent.d";
+  Hashtbl.add asm_strings "" "the.empty.string";
+
+
   let class_map, impl_map, _, ast = cltype in (
 
     (* output vtables from impl_map *)
     List.iteri (fun i (cname, methods) -> (
       fprintf aout ".globl %s..vtable\n%s..vtable:\n" cname cname;
       fprintf aout "\t.quad string%d\n" i; (* name *)
+      (* add class name as a string under the label stringn *)
       Hashtbl.add asm_strings cname ("string"^(string_of_int i));
       fprintf aout "\t.quad %s..new\n" cname; (* constructor *)
       List.iter (fun (mname, _, defclass, _) -> (
@@ -842,13 +847,389 @@ let main() = (
         fprintf aout "%s.%s:\n" cname mname;
         fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
 
-        match cname, mname with 
-        | ("Object", "abort") -> ();
+        (* copied from reference compiler *)
+        (match cname, mname with 
+        | ("IO", "in_int") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "## create new Int\n";
+          fprintf aout "pushq %%rbp\n";
+          fprintf aout "pushq %%r12\n";
+          fprintf aout "movq $Int..new, %%r14\n";
+          fprintf aout "call *%%r14\n";
+          fprintf aout "popq %%r12\n";
+          fprintf aout "popq %%rbp\n";
+          fprintf aout "movq %%r13, %%r14\n";
+          fprintf aout "movl $1, %%esi\n";
+          fprintf aout "movl $4096, %%edi\n";
+          fprintf aout "call calloc\n";
+          fprintf aout "pushq %%rax\n";
+          fprintf aout "movq %%rax, %%rdi\n";
+          fprintf aout "movq $4096, %%rsi\n";
+          fprintf aout "movq stdin(%%rip), %%rdx\n";
+          fprintf aout "call fgets\n";
+          fprintf aout "popq %%rdi\n";
+          fprintf aout "movl $0, %%eax\n";
+          fprintf aout "pushq %%rax\n";
+          fprintf aout "movq %%rsp, %%rdx\n";
+          fprintf aout "movq $percent.d, %%rsi\n";
+          fprintf aout "call sscanf\n";
+          fprintf aout "popq %%rax\n";
+          (* check for int out of bounds *)
+          fprintf aout "movq $0, %%rsi\n"; 
+          fprintf aout "cmpq $2147483647, %%rax\n";
+          fprintf aout "cmovg %%rsi, %%rax\n";
+          fprintf aout "cmpq $-2147483648, %%rax\n";
+          fprintf aout "cmovl %%rsi, %%rax\n";
+          fprintf aout "movq %%rax, %%r13\n";
+          fprintf aout "movq %%r13, 24(%%r14)\n";
+          fprintf aout "movq %%r14, %%r13\n";
+        )
+        | ("IO", "in_string") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "pushq %%rbp\n";
+          fprintf aout "pushq %%r12\n";
+          fprintf aout "movq $String..new, %%r14\n";
+          fprintf aout "call *%%r14\n";
+          fprintf aout "popq %%r12\n";
+          fprintf aout "popq %%rbp\n";
+          fprintf aout "movq %%r13, %%r14\n";
+          fprintf aout "call coolgetstr\n";
+          fprintf aout "movq %%rax, %%r13\n";
+          fprintf aout "movq %%r13, 24(%%r14)\n";
+          fprintf aout "movq %%r14, %%r13\n";
+        )
+        | ("IO", "out_int") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "movq 24(%%rbp), %%r14\n";
+          fprintf aout "movq 24(%%r14), %%r13\n";
+          fprintf aout "movq $percent.d, %%rdi\n";
+          fprintf aout "movl %%r13d, %%eax\n";
+          fprintf aout "cdqe\n";
+          fprintf aout "movq %%rax, %%rsi\n";
+          fprintf aout "movl $0, %%eax\n";
+          fprintf aout "call printf\n";
+          fprintf aout "mov %%r12, %%r13\n";
+        )
+        | ("IO", "out_string") -> (
+          fprintf aout "movq 16(%%rbp), %%r12\n";
+          fprintf aout "subq $8, %%rsp\n";
+          fprintf aout "movq 24(%%rbp), %%r14\n";
+          fprintf aout "movq 24(%%r14), %%r13\n";
+          fprintf aout "movq %%r13, %%rdi\n";
+          fprintf aout "movl %%r13d, %%eax\n";
+          fprintf aout "call cooloutstr\n";
+          fprintf aout "mov %%r12, %%r13\n";
+        )
         | _ -> fprintf aout "\n## MISSING INTERNAL METHOD DEF for %s.%s\n\n" cname mname;
+        );
 
         fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
       )) non_inherited_methods
     )) internal_impl_map;
+
+    (* cooloutstr - copied from ref compiler *)
+    fprintf aout "
+.globl cooloutstr
+	.type	cooloutstr, @function
+cooloutstr:
+.LFB0:
+	.cfi_startproc
+	pushq	%%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%%rsp, %%rbp
+	.cfi_def_cfa_register 6
+	subq	$32, %%rsp
+	movq	%%rdi, -24(%%rbp)
+	movl	$0, -4(%%rbp)
+	jmp	.L2
+.L5:
+	movl	-4(%%rbp), %%eax
+	cltq
+	addq	-24(%%rbp), %%rax
+	movzbl	(%%rax), %%eax
+	cmpb	$92, %%al
+	jne	.L3
+	movl	-4(%%rbp), %%eax
+	cltq
+	addq	$1, %%rax
+	addq	-24(%%rbp), %%rax
+	movzbl	(%%rax), %%eax
+	cmpb	$110, %%al
+	jne	.L3
+	movq	stdout(%%rip), %%rax
+	movq	%%rax, %%rsi
+	movl	$10, %%edi
+	call	fputc
+	addl	$2, -4(%%rbp)
+	jmp	.L2
+.L3:
+	movl	-4(%%rbp), %%eax
+	cltq
+	addq	-24(%%rbp), %%rax
+	movzbl	(%%rax), %%eax
+	cmpb	$92, %%al
+	jne	.L4
+	movl	-4(%%rbp), %%eax
+	cltq
+	addq	$1, %%rax
+	addq	-24(%%rbp), %%rax
+	movzbl	(%%rax), %%eax
+	cmpb	$116, %%al
+	jne	.L4
+	movq	stdout(%%rip), %%rax
+	movq	%%rax, %%rsi
+	movl	$9, %%edi
+	call	fputc
+	addl	$2, -4(%%rbp)
+	jmp	.L2
+.L4:
+	movq	stdout(%%rip), %%rdx
+	movl	-4(%%rbp), %%eax
+	cltq
+	addq	-24(%%rbp), %%rax
+	movzbl	(%%rax), %%eax
+	movsbl	%%al, %%eax
+	movq	%%rdx, %%rsi
+	movl	%%eax, %%edi
+	call	fputc
+	addl	$1, -4(%%rbp)
+.L2:
+	movl	-4(%%rbp), %%eax
+	cltq
+	addq	-24(%%rbp), %%rax
+	movzbl	(%%rax), %%eax
+	testb	%%al, %%al
+	jne	.L5
+	movq	stdout(%%rip), %%rax
+	movq	%%rax, %%rdi
+	call	fflush
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE0:
+	.size	cooloutstr, .-cooloutstr
+    ";
+
+    (* coolstrlen - copied from ref compiler *)
+    fprintf aout "
+    .globl coolstrlen
+	.type	coolstrlen, @function
+coolstrlen:
+.LFB1:
+	.cfi_startproc
+	pushq	%%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%%rsp, %%rbp
+	.cfi_def_cfa_register 6
+	movq	%%rdi, -24(%%rbp)
+	movl	$0, -4(%%rbp)
+	jmp	.L7
+.L8:
+	movl	-4(%%rbp), %%eax
+	addl	$1, %%eax
+	movl	%%eax, -4(%%rbp)
+.L7:
+	movl	-4(%%rbp), %%eax
+	mov	%%eax, %%eax
+	addq	-24(%%rbp), %%rax
+	movzbl	(%%rax), %%eax
+	testb	%%al, %%al
+	jne	.L8
+	movl	-4(%%rbp), %%eax
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE1:
+	.size	coolstrlen, .-coolstrlen
+	.section	.rodata
+    ";
+
+    (* coolstrcat - copied from ref compiler *)
+    fprintf aout "
+    .LC0:
+	.string	\"%%s%%s\"
+	.text
+.globl coolstrcat
+	.type	coolstrcat, @function
+coolstrcat:
+.LFB2:
+	.cfi_startproc
+	pushq	%%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%%rsp, %%rbp
+	.cfi_def_cfa_register 6
+	pushq	%%rbx
+	subq	$40, %%rsp
+	movq	%%rdi, -40(%%rbp)
+	movq	%%rsi, -48(%%rbp)
+	cmpq	$0, -40(%%rbp)
+	jne	.L10
+	.cfi_offset 3, -24
+	movq	-48(%%rbp), %%rax
+	jmp	.L11
+.L10:
+	cmpq	$0, -48(%%rbp)
+	jne	.L12
+	movq	-40(%%rbp), %%rax
+	jmp	.L11
+.L12:
+	movq	-40(%%rbp), %%rax
+	movq	%%rax, %%rdi
+	call	coolstrlen
+	movl	%%eax, %%ebx
+	movq	-48(%%rbp), %%rax
+	movq	%%rax, %%rdi
+	call	coolstrlen
+	leal	(%%rbx,%%rax), %%eax
+	addl	$1, %%eax
+	movl	%%eax, -20(%%rbp)
+	movl	-20(%%rbp), %%eax
+	cltq
+	movl	$1, %%esi
+	movq	%%rax, %%rdi
+	call	calloc
+	movq	%%rax, -32(%%rbp)
+	movl	$.LC0, %%edx
+	movl	-20(%%rbp), %%eax
+	movslq	%%eax, %%rbx
+	movq	-48(%%rbp), %%rsi
+	movq	-40(%%rbp), %%rcx
+	movq	-32(%%rbp), %%rax
+	movq	%%rsi, %%r8
+	movq	%%rbx, %%rsi
+	movq	%%rax, %%rdi
+	movl	$0, %%eax
+	call	snprintf
+	movq	-32(%%rbp), %%rax
+.L11:
+	addq	$40, %%rsp
+	popq	%%rbx
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE2:
+	.size	coolstrcat, .-coolstrcat
+	.section	.rodata
+    ";
+
+    (* coolgetstr - copied from ref compiler *)
+    fprintf aout "
+    .LC1:
+	.string	\"\"
+	.text
+.globl coolgetstr
+	.type	coolgetstr, @function
+coolgetstr:
+.LFB3:
+	.cfi_startproc
+	pushq	%%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%%rsp, %%rbp
+	.cfi_def_cfa_register 6
+	subq	$32, %%rsp
+	movl	$1, %%esi
+	movl	$40960, %%edi
+	call	calloc
+	movq	%%rax, -16(%%rbp)
+	movl	$0, -4(%%rbp)
+.L20:
+	movq	stdin(%%rip), %%rax
+	movq	%%rax, %%rdi
+	call	fgetc
+	movl	%%eax, -20(%%rbp)
+	cmpl	$-1, -20(%%rbp)
+	je	.L14
+	cmpl	$10, -20(%%rbp)
+	jne	.L15
+.L14:
+	cmpl	$0, -4(%%rbp)
+	je	.L16
+	movl	$.LC1, %%eax
+	jmp	.L17
+.L16:
+	movq	-16(%%rbp), %%rax
+	jmp	.L17
+.L15:
+	cmpl	$0, -20(%%rbp)
+	jne	.L18
+	movl	$1, -4(%%rbp)
+	jmp	.L20
+.L18:
+	movq	-16(%%rbp), %%rax
+	movq	%%rax, %%rdi
+	call	coolstrlen
+	mov	%%eax, %%eax
+	addq	-16(%%rbp), %%rax
+	movl	-20(%%rbp), %%edx
+	movb	%%dl, (%%rax)
+	jmp	.L20
+.L17:
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE3:
+	.size	coolgetstr, .-coolgetstr
+    ";
+
+    (* coolsubstr - copied from ref compiler *)
+    fprintf aout ".globl coolsubstr
+	.type	coolsubstr, @function
+coolsubstr:
+.LFB4:
+	.cfi_startproc
+	pushq	%%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%%rsp, %%rbp
+	.cfi_def_cfa_register 6
+	subq	$48, %%rsp
+	movq	%%rdi, -24(%%rbp)
+	movq	%%rsi, -32(%%rbp)
+	movq	%%rdx, -40(%%rbp)
+	movq	-24(%%rbp), %%rax
+	movq	%%rax, %%rdi
+	call	coolstrlen
+	movl	%%eax, -4(%%rbp)
+	cmpq	$0, -32(%%rbp)
+	js	.L22
+	cmpq	$0, -40(%%rbp)
+	js	.L22
+	movq	-40(%%rbp), %%rax
+	movq	-32(%%rbp), %%rdx
+	addq	%%rax, %%rdx
+	movl	-4(%%rbp), %%eax
+	cltq
+	cmpq	%%rax, %%rdx
+	jle	.L23
+.L22:
+	movl	$0, %%eax
+	jmp	.L24
+.L23:
+	movq	-40(%%rbp), %%rdx
+	movq	-32(%%rbp), %%rax
+	addq	-24(%%rbp), %%rax
+	movq	%%rdx, %%rsi
+	movq	%%rax, %%rdi
+	call	strndup
+.L24:
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE4:
+	.size	coolsubstr, .-coolsubstr
+";
 
     fprintf aout "\n## INTERNAL METHOD BODIES END\n";
 
@@ -856,9 +1237,6 @@ let main() = (
     Hashtbl.iter (fun cname sname -> (
       print_asm_string aout sname cname
     )) asm_strings;
-
-    print_asm_string aout "the.empty.string" "";
-
 
     (* print out program start *)
 
