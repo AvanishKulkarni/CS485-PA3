@@ -663,6 +663,16 @@ let main() = (
     ) tac_instructions;
   ) in
 
+  let call_new fout cname = (
+    fprintf fout "\t## new %s\n" cname;
+    fprintf fout "\tpushq %%rbp\n";
+    fprintf fout "\tpushq %%r12\n";
+    fprintf fout "\tmovq $%s..new, %%r14\n" cname;
+    fprintf fout "\tcall *%%r14\n";
+    fprintf fout "\tpopq %%r12\n";
+    fprintf fout "\tpopq %%rbp\n";
+  )
+  in
   (* convert TAC instructions into asm *)
   let tac_to_asm fout tac_instructions = (
     List.iter ( fun x ->
@@ -925,125 +935,125 @@ let main() = (
           fprintf aout "\tmov %%r12, %%r13\n";
         )
         | "Object", "abort" -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "movq $abort.string, %%rdi\n";
-          fprintf aout "call cooloutstr\n";
-          fprintf aout "movl $0, %%edi\n";
-          fprintf aout "call exit\n";
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq $abort.string, %%rdi\n";
+          fprintf aout "\tcall cooloutstr\n";
+          fprintf aout "\tmovl $0, %%edi\n";
+          fprintf aout "\tcall exit\n";
         )
         | "Object", "copy" -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "movq $8, %%rsi\n";
-          fprintf aout "movq 8(%%r12), %%r14\n";
-          fprintf aout "movq %%r14, %%rdi\n";
-          fprintf aout "call calloc\n";
-          fprintf aout "movq %%rax, %%r13\n";
-          fprintf aout "pushq %%r13\n";
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq $8, %%rsi\n";
+          fprintf aout "\tmovq 8(%%r12), %%r14\n";
+          fprintf aout "\tmovq %%r14, %%rdi\n";
+          fprintf aout "\tcall calloc\n";
+          fprintf aout "\tmovq %%rax, %%r13\n";
+          fprintf aout "\tpushq %%r13\n";
           fprintf aout "\n";
 
           (* idk what this does, copied from ref compiler *)
           fprintf aout "
 .globl l1
 l1:
-  cmpq $0, %%r14
-  je l2
-  movq 0(%%r12), %%r15
-  movq %%r15, 0(%%r13)
-  movq $8, %%r15
-  addq %%r15, %%r12
-  addq %%r15, %%r13
-  movq $1, %%r15
-  subq %%r15, %%r14
-  jmp l1
+\tcmpq $0, %%r14
+\tje l2
+\tmovq 0(%%r12), %%r15
+\tmovq %%r15, 0(%%r13)
+\tmovq $8, %%r15
+\taddq %%r15, %%r12
+\taddq %%r15, %%r13
+\tmovq $1, %%r15
+\tsubq %%r15, %%r14
+\tjmp l1
 .globl l2
 l2:                     ## done with Object.copy loop
-  popq %%r13
+\tpopq %%r13
 ";
         )
         | "Object", "type_name" -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "pushq %%rbp\n";
-          fprintf aout "pushq %%r12\n";
-          fprintf aout "movq $String..new, %%r14\n";
-          fprintf aout "call *%%r14\n";
-          fprintf aout "popq %%r12\n";
-          fprintf aout "popq %%rbp\n";
-          fprintf aout "movq 16(%%r12), %%r14\n";
-          fprintf aout "movq 0(%%r14), %%r14\n";
-          fprintf aout "movq %%r14, 24(%%r13)\n";
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tpushq %%rbp\n";
+          fprintf aout "\tpushq %%r12\n";
+          fprintf aout "\tmovq $String..new, %%r14\n";
+          fprintf aout "\tcall *%%r14\n";
+          fprintf aout "\tpopq %%r12\n";
+          fprintf aout "\tpopq %%rbp\n";
+          fprintf aout "\tmovq 16(%%r12), %%r14\n";
+          fprintf aout "\tmovq 0(%%r14), %%r14\n";
+          fprintf aout "\tmovq %%r14, 24(%%r13)\n";
         )
         | "String", "length" -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "pushq %%rbp\n";
-          fprintf aout "pushq %%r12\n";
-          fprintf aout "movq $Int..new, %%r14\n";
-          fprintf aout "call *%%r14\n";
-          fprintf aout "popq %%r12\n";
-          fprintf aout "popq %%rbp\n";
-          fprintf aout "movq %%r13, %%r14\n";
-          fprintf aout "movq 24(%%r12), %%r13\n";
-          fprintf aout "movq %%r13, %%rdi\n";
-          fprintf aout "movl $0, %%eax\n";
-          fprintf aout "call coolstrlen\n";
-          fprintf aout "movq %%rax, %%r13\n";
-          fprintf aout "movq %%r13, 24(%%r14)\n";
-          fprintf aout "movq %%r14, %%r13\n";
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tpushq %%rbp\n";
+          fprintf aout "\tpushq %%r12\n";
+          fprintf aout "\tmovq $Int..new, %%r14\n";
+          fprintf aout "\tcall *%%r14\n";
+          fprintf aout "\tpopq %%r12\n";
+          fprintf aout "\tpopq %%rbp\n";
+          fprintf aout "\tmovq %%r13, %%r14\n";
+          fprintf aout "\tmovq 24(%%r12), %%r13\n";
+          fprintf aout "\tmovq %%r13, %%rdi\n";
+          fprintf aout "\tmovl $0, %%eax\n";
+          fprintf aout "\tcall coolstrlen\n";
+          fprintf aout "\tmovq %%rax, %%r13\n";
+          fprintf aout "\tmovq %%r13, 24(%%r14)\n";
+          fprintf aout "\tmovq %%r14, %%r13\n";
         )
         | "String", "concat" -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "pushq %%rbp\n";
-          fprintf aout "pushq %%r12\n";
-          fprintf aout "movq $String..new, %%r14\n";
-          fprintf aout "call *%%r14\n";
-          fprintf aout "popq %%r12\n";
-          fprintf aout "popq %%rbp\n";
-          fprintf aout "movq %%r13, %%r15\n";
-          fprintf aout "movq 24(%%rbp), %%r14\n";
-          fprintf aout "movq 24(%%r14), %%r14\n";
-          fprintf aout "movq 24(%%r12), %%r13\n";
-          fprintf aout "movq %%r13, %%rdi\n";
-          fprintf aout "movq %%r14, %%rsi\n";
-          fprintf aout "call coolstrcat\n";
-          fprintf aout "movq %%rax, %%r13\n";
-          fprintf aout "movq %%r13, 24(%%r15)\n";
-          fprintf aout "movq %%r15, %%r13\n";
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tpushq %%rbp\n";
+          fprintf aout "\tpushq %%r12\n";
+          fprintf aout "\tmovq $String..new, %%r14\n";
+          fprintf aout "\tcall *%%r14\n";
+          fprintf aout "\tpopq %%r12\n";
+          fprintf aout "\tpopq %%rbp\n";
+          fprintf aout "\tmovq %%r13, %%r15\n";
+          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 24(%%r14), %%r14\n";
+          fprintf aout "\tmovq 24(%%r12), %%r13\n";
+          fprintf aout "\tmovq %%r13, %%rdi\n";
+          fprintf aout "\tmovq %%r14, %%rsi\n";
+          fprintf aout "\tcall coolstrcat\n";
+          fprintf aout "\tmovq %%rax, %%r13\n";
+          fprintf aout "\tmovq %%r13, 24(%%r15)\n";
+          fprintf aout "\tmovq %%r15, %%r13\n";
         )
         | "String", "substr" -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "pushq %%rbp\n";
-          fprintf aout "pushq %%r12\n";
-          fprintf aout "movq $String..new, %%r14\n";
-          fprintf aout "call *%%r14\n";
-          fprintf aout "popq %%r12\n";
-          fprintf aout "popq %%rbp\n";
-          fprintf aout "movq %%r13, %%r15\n";
-          fprintf aout "movq 24(%%rbp), %%r14\n";
-          fprintf aout "movq 24(%%r14), %%r14\n";
-          fprintf aout "movq 32(%%rbp), %%r13\n";
-          fprintf aout "movq 24(%%r13), %%r13\n";
-          fprintf aout "movq 24(%%r12), %%r12\n";
-          fprintf aout "movq %%r12, %%rdi\n";
-          fprintf aout "movq %%r13, %%rsi\n";
-          fprintf aout "movq %%r14, %%rdx\n";
-          fprintf aout "call coolsubstr\n";
-          fprintf aout "movq %%rax, %%r13\n";
-          fprintf aout "cmpq $0, %%r13\n";
-          fprintf aout "jne l3\n";
-          fprintf aout "movq $substr.error.string, %%r13\n";
-          fprintf aout "movq %%r13, %%rdi\n";
-          fprintf aout "call cooloutstr\n";
-          fprintf aout "movl $0, %%edi\n";
-          fprintf aout "call exit\n";
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tpushq %%rbp\n";
+          fprintf aout "\tpushq %%r12\n";
+          fprintf aout "\tmovq $String..new, %%r14\n";
+          fprintf aout "\tcall *%%r14\n";
+          fprintf aout "\tpopq %%r12\n";
+          fprintf aout "\tpopq %%rbp\n";
+          fprintf aout "\tmovq %%r13, %%r15\n";
+          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 24(%%r14), %%r14\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r13\n";
+          fprintf aout "\tmovq 24(%%r13), %%r13\n";
+          fprintf aout "\tmovq 24(%%r12), %%r12\n";
+          fprintf aout "\tmovq %%r12, %%rdi\n";
+          fprintf aout "\tmovq %%r13, %%rsi\n";
+          fprintf aout "\tmovq %%r14, %%rdx\n";
+          fprintf aout "\tcall coolsubstr\n";
+          fprintf aout "\tmovq %%rax, %%r13\n";
+          fprintf aout "\tcmpq $0, %%r13\n";
+          fprintf aout "\tjne l3\n";
+          fprintf aout "\tmovq $substr.error.string, %%r13\n";
+          fprintf aout "\tmovq %%r13, %%rdi\n";
+          fprintf aout "\tcall cooloutstr\n";
+          fprintf aout "\tmovl $0, %%edi\n";
+          fprintf aout "\tcall exit\n";
           fprintf aout ".globl l3\n";
           fprintf aout "l3:\n";
-          fprintf aout "movq %%r13, 24(%%r15)\n";
-          fprintf aout "movq %%r15, %%r13\n";
+          fprintf aout "\tmovq %%r13, 24(%%r15)\n";
+          fprintf aout "\tmovq %%r15, %%r13\n";
         )
         | _ -> fprintf aout "\n## MISSING INTERNAL METHOD DEF for %s.%s\n\n" cname mname;
         );
