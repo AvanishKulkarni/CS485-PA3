@@ -850,81 +850,81 @@ let main() = (
 
         (* copied from reference compiler *)
         (match cname, mname with 
-        | ("IO", "in_int") -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "## create new Int\n";
-          fprintf aout "pushq %%rbp\n";
-          fprintf aout "pushq %%r12\n";
-          fprintf aout "movq $Int..new, %%r14\n";
-          fprintf aout "call *%%r14\n";
-          fprintf aout "popq %%r12\n";
-          fprintf aout "popq %%rbp\n";
-          fprintf aout "movq %%r13, %%r14\n";
-          fprintf aout "movl $1, %%esi\n";
-          fprintf aout "movl $4096, %%edi\n";
-          fprintf aout "call calloc\n";
-          fprintf aout "pushq %%rax\n";
-          fprintf aout "movq %%rax, %%rdi\n";
-          fprintf aout "movq $4096, %%rsi\n";
-          fprintf aout "movq stdin(%%rip), %%rdx\n";
-          fprintf aout "call fgets\n";
-          fprintf aout "popq %%rdi\n";
-          fprintf aout "movl $0, %%eax\n";
-          fprintf aout "pushq %%rax\n";
-          fprintf aout "movq %%rsp, %%rdx\n";
-          fprintf aout "movq $percent.d, %%rsi\n";
-          fprintf aout "call sscanf\n";
-          fprintf aout "popq %%rax\n";
+        | "IO", "in_int" -> (
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\t## create new Int\n";
+          fprintf aout "\tpushq %%rbp\n";
+          fprintf aout "\tpushq %%r12\n";
+          fprintf aout "\tmovq $Int..new, %%r14\n";
+          fprintf aout "\tcall *%%r14\n";
+          fprintf aout "\tpopq %%r12\n";
+          fprintf aout "\tpopq %%rbp\n";
+          fprintf aout "\tmovq %%r13, %%r14\n";
+          fprintf aout "\tmovl $1, %%esi\n";
+          fprintf aout "\tmovl $4096, %%edi\n";
+          fprintf aout "\tcall calloc\n";
+          fprintf aout "\tpushq %%rax\n";
+          fprintf aout "\tmovq %%rax, %%rdi\n";
+          fprintf aout "\tmovq $4096, %%rsi\n";
+          fprintf aout "\tmovq stdin(%%rip), %%rdx\n";
+          fprintf aout "\tcall fgets\n";
+          fprintf aout "\tpopq %%rdi\n";
+          fprintf aout "\tmovl $0, %%eax\n";
+          fprintf aout "\tpushq %%rax\n";
+          fprintf aout "\tmovq %%rsp, %%rdx\n";
+          fprintf aout "\tmovq $percent.d, %%rsi\n";
+          fprintf aout "\tcall sscanf\n";
+          fprintf aout "\tpopq %%rax\n";
           (* check for int out of bounds *)
-          fprintf aout "movq $0, %%rsi\n"; 
-          fprintf aout "cmpq $2147483647, %%rax\n";
-          fprintf aout "cmovg %%rsi, %%rax\n";
-          fprintf aout "cmpq $-2147483648, %%rax\n";
-          fprintf aout "cmovl %%rsi, %%rax\n";
-          fprintf aout "movq %%rax, %%r13\n";
-          fprintf aout "movq %%r13, 24(%%r14)\n";
-          fprintf aout "movq %%r14, %%r13\n";
+          fprintf aout "\tmovq $0, %%rsi\n"; 
+          fprintf aout "\tcmpq $2147483647, %%rax\n";
+          fprintf aout "\tcmovg %%rsi, %%rax\n";
+          fprintf aout "\tcmpq $-2147483648, %%rax\n";
+          fprintf aout "\tcmovl %%rsi, %%rax\n";
+          fprintf aout "\tmovq %%rax, %%r13\n";
+          fprintf aout "\tmovq %%r13, 24(%%r14)\n";
+          fprintf aout "\tmovq %%r14, %%r13\n";
         )
-        | ("IO", "in_string") -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "pushq %%rbp\n";
-          fprintf aout "pushq %%r12\n";
-          fprintf aout "movq $String..new, %%r14\n";
-          fprintf aout "call *%%r14\n";
-          fprintf aout "popq %%r12\n";
-          fprintf aout "popq %%rbp\n";
-          fprintf aout "movq %%r13, %%r14\n";
-          fprintf aout "call coolgetstr\n";
-          fprintf aout "movq %%rax, %%r13\n";
-          fprintf aout "movq %%r13, 24(%%r14)\n";
-          fprintf aout "movq %%r14, %%r13\n";
+        | "IO", "in_string" -> (
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tpushq %%rbp\n";
+          fprintf aout "\tpushq %%r12\n";
+          fprintf aout "\tmovq $String..new, %%r14\n";
+          fprintf aout "\tcall *%%r14\n";
+          fprintf aout "\tpopq %%r12\n";
+          fprintf aout "\tpopq %%rbp\n";
+          fprintf aout "\tmovq %%r13, %%r14\n";
+          fprintf aout "\tcall coolgetstr\n";
+          fprintf aout "\tmovq %%rax, %%r13\n";
+          fprintf aout "\tmovq %%r13, 24(%%r14)\n";
+          fprintf aout "\tmovq %%r14, %%r13\n";
         )
-        | ("IO", "out_int") -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "movq 24(%%rbp), %%r14\n";
-          fprintf aout "movq 24(%%r14), %%r13\n";
-          fprintf aout "movq $percent.d, %%rdi\n";
-          fprintf aout "movl %%r13d, %%eax\n";
-          fprintf aout "cdqe\n";
-          fprintf aout "movq %%rax, %%rsi\n";
-          fprintf aout "movl $0, %%eax\n";
-          fprintf aout "call printf\n";
-          fprintf aout "mov %%r12, %%r13\n";
+        | "IO", "out_int" -> (
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 24(%%r14), %%r13\n";
+          fprintf aout "\tmovq $percent.d, %%rdi\n";
+          fprintf aout "\tmovl %%r13d, %%eax\n";
+          fprintf aout "\tcdqe\n";
+          fprintf aout "\tmovq %%rax, %%rsi\n";
+          fprintf aout "\tmovl $0, %%eax\n";
+          fprintf aout "\tcall printf\n";
+          fprintf aout "\tmov %%r12, %%r13\n";
         )
-        | ("IO", "out_string") -> (
-          fprintf aout "movq 16(%%rbp), %%r12\n";
-          fprintf aout "subq $8, %%rsp\n";
-          fprintf aout "movq 24(%%rbp), %%r14\n";
-          fprintf aout "movq 24(%%r14), %%r13\n";
-          fprintf aout "movq %%r13, %%rdi\n";
-          fprintf aout "movl %%r13d, %%eax\n";
-          fprintf aout "call cooloutstr\n";
-          fprintf aout "mov %%r12, %%r13\n";
+        | "IO", "out_string" -> (
+          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 24(%%r14), %%r13\n";
+          fprintf aout "\tmovq %%r13, %%rdi\n";
+          fprintf aout "\tmovl %%r13d, %%eax\n";
+          fprintf aout "\tcall cooloutstr\n";
+          fprintf aout "\tmov %%r12, %%r13\n";
         )
-        | ("Object", "abort") -> (
+        | "Object", "abort" -> (
           fprintf aout "movq 16(%%rbp), %%r12\n";
           fprintf aout "subq $8, %%rsp\n";
           fprintf aout "movq $abort.string, %%rdi\n";
@@ -932,7 +932,7 @@ let main() = (
           fprintf aout "movl $0, %%edi\n";
           fprintf aout "call exit\n";
         )
-        | ("Object", "copy") -> (
+        | "Object", "copy" -> (
           fprintf aout "movq 16(%%rbp), %%r12\n";
           fprintf aout "subq $8, %%rsp\n";
           fprintf aout "movq $8, %%rsi\n";
@@ -962,7 +962,7 @@ l2:                     ## done with Object.copy loop
   popq %%r13
 ";
         )
-        | ("Object", "type_name") -> (
+        | "Object", "type_name" -> (
           fprintf aout "movq 16(%%rbp), %%r12\n";
           fprintf aout "subq $8, %%rsp\n";
           fprintf aout "pushq %%rbp\n";
@@ -975,7 +975,7 @@ l2:                     ## done with Object.copy loop
           fprintf aout "movq 0(%%r14), %%r14\n";
           fprintf aout "movq %%r14, 24(%%r13)\n";
         )
-        | ("String", "length") -> (
+        | "String", "length" -> (
           fprintf aout "movq 16(%%rbp), %%r12\n";
           fprintf aout "subq $8, %%rsp\n";
           fprintf aout "pushq %%rbp\n";
@@ -993,7 +993,7 @@ l2:                     ## done with Object.copy loop
           fprintf aout "movq %%r13, 24(%%r14)\n";
           fprintf aout "movq %%r14, %%r13\n";
         )
-        | ("String", "concat") -> (
+        | "String", "concat" -> (
           fprintf aout "movq 16(%%rbp), %%r12\n";
           fprintf aout "subq $8, %%rsp\n";
           fprintf aout "pushq %%rbp\n";
@@ -1013,7 +1013,7 @@ l2:                     ## done with Object.copy loop
           fprintf aout "movq %%r13, 24(%%r15)\n";
           fprintf aout "movq %%r15, %%r13\n";
         )
-        | ("String", "substr") -> (
+        | "String", "substr" -> (
           fprintf aout "movq 16(%%rbp), %%r12\n";
           fprintf aout "subq $8, %%rsp\n";
           fprintf aout "pushq %%rbp\n";
