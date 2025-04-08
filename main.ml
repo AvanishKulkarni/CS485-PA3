@@ -1026,12 +1026,7 @@ in
           fprintf aout "\t## return address handling\n";
           fprintf aout "\t## method body begins\n";
           fprintf aout "\t## new Int\n";
-          fprintf aout "\tpushq %%rbp\n";
-          fprintf aout "\tpushq %%r12\n";
-          fprintf aout "\tmovq $Int..new, %%r14\n";
-          fprintf aout "\tcall *%%r14\n";
-          fprintf aout "\tpopq %%r12\n";
-          fprintf aout "\tpopq %%rbp\n";
+          call_new aout "Int";
           fprintf aout "\tmovq %%r13, %%r14\n";
           fprintf aout "\tmovl	$1, %%esi\n";
           fprintf aout "\tmovl $4096, %%edi\n";
