@@ -575,7 +575,7 @@ let main() = (
         let tlbl = TAC_Label(thenlbl) in
         let ecomm = TAC_Comment("else branch") in 
         let elbl = TAC_Label(elselbl) in 
-        let jcomm = TAC_Comment("if-join") in 
+        let jcomm = TAC_Comment(sprintf "if-join %s-%s" thenlbl elselbl) in 
         let jlbl = TAC_Label(joinlbl) in 
         let jjmp = TAC_Jump(joinlbl) in 
         !currNode.blocks <- !currNode.blocks @ [be];
