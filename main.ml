@@ -815,6 +815,10 @@ let main() = (
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_NullCheck(var, i) ->
       fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
+      (* TODO later *)
+      (* if class tag is Int, String, Bool -> return Bool(false) *)
+      (* if class tag is something else, check if not initialized *)
+      (* return Bool(true) if not initialized, Bool(false) otherwise *)
     | TAC_Assign_FunctionCall(var, mname, None) ->
       fprintf fout "%s <- call %s\n" var mname;
     | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
@@ -1016,8 +1020,12 @@ in
         (match cname, mname with 
         | "IO", "in_int" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
-          fprintf aout "\t## create new Int\n";
+          fprintf aout "\t## stack room for temporaries: 2\n";
+          fprintf aout "\tmovq $16, %%r14\n";
+          fprintf aout "\tsubq %%r14, %%rsp\n";
+          fprintf aout "\t## return address handling\n";
+          fprintf aout "\t## method body begins\n";
+          fprintf aout "\t## new Int\n";
           fprintf aout "\tpushq %%rbp\n";
           fprintf aout "\tpushq %%r12\n";
           fprintf aout "\tmovq $Int..new, %%r14\n";
@@ -1025,7 +1033,7 @@ in
           fprintf aout "\tpopq %%r12\n";
           fprintf aout "\tpopq %%rbp\n";
           fprintf aout "\tmovq %%r13, %%r14\n";
-          fprintf aout "\tmovl $1, %%esi\n";
+          fprintf aout "\tmovl	$1, %%esi\n";
           fprintf aout "\tmovl $4096, %%edi\n";
           fprintf aout "\tcall calloc\n";
           fprintf aout "\tpushq %%rax\n";
@@ -1040,8 +1048,7 @@ in
           fprintf aout "\tmovq $percent.d, %%rsi\n";
           fprintf aout "\tcall sscanf\n";
           fprintf aout "\tpopq %%rax\n";
-          (* check for int out of bounds *)
-          fprintf aout "\tmovq $0, %%rsi\n"; 
+          fprintf aout "\tmovq $0, %%rsi\n";
           fprintf aout "\tcmpq $2147483647, %%rax\n";
           fprintf aout "\tcmovg %%rsi, %%rax\n";
           fprintf aout "\tcmpq $-2147483648, %%rax\n";
@@ -1051,8 +1058,7 @@ in
           fprintf aout "\tmovq %%r14, %%r13\n";
         )
         | "IO", "in_string" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tpushq %%rbp\n";
           fprintf aout "\tpushq %%r12\n";
           fprintf aout "\tmovq $String..new, %%r14\n";
@@ -1060,6 +1066,8 @@ in
           fprintf aout "\tpopq %%r12\n";
           fprintf aout "\tpopq %%rbp\n";
           fprintf aout "\tmovq %%r13, %%r14\n";
+          fprintf aout "\t## guarantee 16-byte alignment before call\n";
+          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
           fprintf aout "\tcall coolgetstr\n";
           fprintf aout "\tmovq %%rax, %%r13\n";
           fprintf aout "\tmovq %%r13, 24(%%r14)\n";
@@ -1081,13 +1089,16 @@ in
         )
         | "IO", "out_string" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq $16, %%r14\n";
+          fprintf aout "\tsubq %%r14, %%rsp\n";
           fprintf aout "\tmovq 24(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r13\n";
+          fprintf aout "\t## guarantee 16-byte alignment before call\n";
+          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
           fprintf aout "\tmovq %%r13, %%rdi\n";
-          fprintf aout "\tmovl %%r13d, %%eax\n";
           fprintf aout "\tcall cooloutstr\n";
-          fprintf aout "\tmov %%r12, %%r13\n";
+          fprintf aout "\tmovq %%r12, %%r13\n";
+          fprintf aout "\tret\n";
         )
         | "Object", "abort" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
@@ -1099,33 +1110,28 @@ in
         )
         | "Object", "copy" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
-          fprintf aout "\tmovq $8, %%rsi\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tmovq 8(%%r12), %%r14\n";
+          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+          fprintf aout "\tmovq $8, %%rsi\n";
           fprintf aout "\tmovq %%r14, %%rdi\n";
-          fprintf aout "\tcall calloc\n";
           fprintf aout "\tmovq %%rax, %%r13\n";
           fprintf aout "\tpushq %%r13\n";
-          fprintf aout "\n";
-
-          (* idk what this does, copied from ref compiler *)
-          fprintf aout "
-.globl l1
-l1:
-\tcmpq $0, %%r14
-\tje l2
-\tmovq 0(%%r12), %%r15
-\tmovq %%r15, 0(%%r13)
-\tmovq $8, %%r15
-\taddq %%r15, %%r12
-\taddq %%r15, %%r13
-\tmovq $1, %%r15
-\tsubq %%r15, %%r14
-\tjmp l1
-.globl l2
-l2:                     ## done with Object.copy loop
-\tpopq %%r13
-";
+          fprintf aout ".globl l1\n";
+          fprintf aout "l1:\n";
+          fprintf aout "\tcmpq $0, %%r14\n";
+          fprintf aout "\tje l2\n";
+          fprintf aout "\tmovq 0(%%r12), %%r15\n";
+          fprintf aout "\tmovq %%r15, 0(%%r13)\n";
+          fprintf aout "\tmovq $8, %%r15\n";
+          fprintf aout "\taddq %%r15, %%r12\n";
+          fprintf aout "\taddq %%r15, %%r13\n";
+          fprintf aout "\tmovq $1, %%r15\n";
+          fprintf aout "\tsubq %%r15, %%r14\n";
+          fprintf aout "\tjmp l1\n";
+          fprintf aout ".globl l2\n";
+          fprintf aout "l2:\n";
+          fprintf aout "\tpopq %%r13\n";
         )
         | "Object", "type_name" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
@@ -1218,305 +1224,330 @@ l2:                     ## done with Object.copy loop
     )) internal_impl_map;
 
     (* cooloutstr - copied from ref compiler *)
-    fprintf aout "
-.globl cooloutstr
-	.type	cooloutstr, @function
-cooloutstr:
-.LFB0:
-	.cfi_startproc
-	pushq	%%rbp
-	.cfi_def_cfa_offset 16
-	.cfi_offset 6, -16
-	movq	%%rsp, %%rbp
-	.cfi_def_cfa_register 6
-	subq	$32, %%rsp
-	movq	%%rdi, -24(%%rbp)
-	movl	$0, -4(%%rbp)
-	jmp	.L2
-.L5:
-	movl	-4(%%rbp), %%eax
-	cltq
-	addq	-24(%%rbp), %%rax
-	movzbl	(%%rax), %%eax
-	cmpb	$92, %%al
-	jne	.L3
-	movl	-4(%%rbp), %%eax
-	cltq
-	addq	$1, %%rax
-	addq	-24(%%rbp), %%rax
-	movzbl	(%%rax), %%eax
-	cmpb	$110, %%al
-	jne	.L3
-	movq	stdout(%%rip), %%rax
-	movq	%%rax, %%rsi
-	movl	$10, %%edi
-	call	fputc
-	addl	$2, -4(%%rbp)
-	jmp	.L2
-.L3:
-	movl	-4(%%rbp), %%eax
-	cltq
-	addq	-24(%%rbp), %%rax
-	movzbl	(%%rax), %%eax
-	cmpb	$92, %%al
-	jne	.L4
-	movl	-4(%%rbp), %%eax
-	cltq
-	addq	$1, %%rax
-	addq	-24(%%rbp), %%rax
-	movzbl	(%%rax), %%eax
-	cmpb	$116, %%al
-	jne	.L4
-	movq	stdout(%%rip), %%rax
-	movq	%%rax, %%rsi
-	movl	$9, %%edi
-	call	fputc
-	addl	$2, -4(%%rbp)
-	jmp	.L2
-.L4:
-	movq	stdout(%%rip), %%rdx
-	movl	-4(%%rbp), %%eax
-	cltq
-	addq	-24(%%rbp), %%rax
-	movzbl	(%%rax), %%eax
-	movsbl	%%al, %%eax
-	movq	%%rdx, %%rsi
-	movl	%%eax, %%edi
-	call	fputc
-	addl	$1, -4(%%rbp)
-.L2:
-	movl	-4(%%rbp), %%eax
-	cltq
-	addq	-24(%%rbp), %%rax
-	movzbl	(%%rax), %%eax
-	testb	%%al, %%al
-	jne	.L5
-	movq	stdout(%%rip), %%rax
-	movq	%%rax, %%rdi
-	call	fflush
-	leave
-	.cfi_def_cfa 7, 8
-	ret
-	.cfi_endproc
-.LFE0:
-	.size	cooloutstr, .-cooloutstr
-    ";
+    fprintf aout ".globl cooloutstr\n";
+    fprintf aout ".type cooloutstr, @function\n";
+    fprintf aout "cooloutstr:\n";
+    fprintf aout ".LFB6:\n";
+    fprintf aout "\t.cfi_startproc\n";
+    fprintf aout "\tendbr64\n";
+    fprintf aout "\tpushq	%%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_offset 16\n";
+    fprintf aout "\t.cfi_offset 6, -16\n";
+    fprintf aout "\tmovq	%%rsp, %%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_register 6\n";
+    fprintf aout "\tsubq	$32, %%rsp\n";
+    fprintf aout "\tmovq	%%rdi, -24(%%rbp)\n";
+    fprintf aout "\tmovl	$0, -4(%%rbp)\n";
+    fprintf aout "\tjmp	.L2\n";
+    fprintf aout ".L5:\n";
+    fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
+    fprintf aout "\tmovslq	%%eax, %%rdx\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\taddq	%%rdx, %%rax\n";
+    fprintf aout "\tmovzbl	(%%rax), %%eax\n";
+    fprintf aout "\tcmpb	$92, %%al\n";
+    fprintf aout "\tjne	.L3\n";
+    fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
+    fprintf aout "\tcltq\n";
+    fprintf aout "\tleaq	1(%%rax), %%rdx\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\taddq	%%rdx, %%rax\n";
+    fprintf aout "\tmovzbl	(%%rax), %%eax\n";
+    fprintf aout "\tcmpb	$110, %%al\n";
+    fprintf aout "\tjne	.L3\n";
+    fprintf aout "\tmovq	stdout(%%rip), %%rax\n";
+    fprintf aout "\tmovq	%%rax, %%rsi\n";
+    fprintf aout "\tmovl	$10, %%edi\n";
+    fprintf aout "\tcall	fputc@PLT\n";
+    fprintf aout "\taddl	$2, -4(%%rbp)\n";
+    fprintf aout "\tjmp	.L2\n";
+    fprintf aout ".L3:\n";
+    fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
+    fprintf aout "\tmovslq	%%eax, %%rdx\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\taddq	%%rdx, %%rax\n";
+    fprintf aout "\tmovzbl	(%%rax), %%eax\n";
+    fprintf aout "\tcmpb	$92, %%al\n";
+    fprintf aout "\tjne	.L4\n";
+    fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
+    fprintf aout "\tcltq\n";
+    fprintf aout "\tleaq	1(%%rax), %%rdx\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\taddq	%%rdx, %%rax\n";
+    fprintf aout "\tmovzbl	(%%rax), %%eax\n";
+    fprintf aout "\tcmpb	$116, %%al\n";
+    fprintf aout "\tjne	.L4\n";
+    fprintf aout "\tmovq	stdout(%%rip), %%rax\n";
+    fprintf aout "\tmovq	%%rax, %%rsi\n";
+    fprintf aout "\tmovl	$9, %%edi\n";
+    fprintf aout "\tcall	fputc@PLT\n";
+    fprintf aout "\taddl	$2, -4(%%rbp)\n";
+    fprintf aout "\tjmp	.L2\n";
+    fprintf aout ".L4:\n";
+    fprintf aout "\tmovq	stdout(%%rip), %%rdx\n";
+    fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
+    fprintf aout "\tmovslq	%%eax, %%rcx\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\taddq	%%rcx, %%rax\n";
+    fprintf aout "\tmovzbl	(%%rax), %%eax\n";
+    fprintf aout "\tmovsbl	%%al, %%eax\n";
+    fprintf aout "\tmovq	%%rdx, %%rsi\n";
+    fprintf aout "\tmovl	%%eax, %%edi\n";
+    fprintf aout "\tcall	fputc@PLT\n";
+    fprintf aout "\taddl	$1, -4(%%rbp)\n";
+    fprintf aout ".L2:\n";
+    fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
+    fprintf aout "\tmovslq	%%eax, %%rdx\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\taddq	%%rdx, %%rax\n";
+    fprintf aout "\tmovzbl	(%%rax), %%eax\n";
+    fprintf aout "\ttestb	%%al, %%al\n";
+    fprintf aout "\tjne	.L5\n";
+    fprintf aout "\tmovq	stdout(%%rip), %%rax\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tcall	fflush@PLT\n";
+    fprintf aout "\tnop\n";
+    fprintf aout "\tleave\n";
+    fprintf aout "\t.cfi_def_cfa 7, 8\n";
+    fprintf aout "\tret\n";
+    fprintf aout "\t.cfi_endproc\n";
+    fprintf aout ".LFE6:\n";
+    fprintf aout "\t.size	cooloutstr, .-cooloutstr\n";
+
 
     (* coolstrlen - copied from ref compiler *)
-    fprintf aout "
-    .globl coolstrlen
-	.type	coolstrlen, @function
-coolstrlen:
-.LFB1:
-	.cfi_startproc
-	pushq	%%rbp
-	.cfi_def_cfa_offset 16
-	.cfi_offset 6, -16
-	movq	%%rsp, %%rbp
-	.cfi_def_cfa_register 6
-	movq	%%rdi, -24(%%rbp)
-	movl	$0, -4(%%rbp)
-	jmp	.L7
-.L8:
-	movl	-4(%%rbp), %%eax
-	addl	$1, %%eax
-	movl	%%eax, -4(%%rbp)
-.L7:
-	movl	-4(%%rbp), %%eax
-	mov	%%eax, %%eax
-	addq	-24(%%rbp), %%rax
-	movzbl	(%%rax), %%eax
-	testb	%%al, %%al
-	jne	.L8
-	movl	-4(%%rbp), %%eax
-	leave
-	.cfi_def_cfa 7, 8
-	ret
-	.cfi_endproc
-.LFE1:
-	.size	coolstrlen, .-coolstrlen
-	.section	.rodata
-    ";
+    fprintf aout ".globl coolstrlen\n";
+    fprintf aout ".type coolstrlen, @function\n";
+    fprintf aout "coolstrlen:\n";
+    fprintf aout ".LFB7:\n";
+    fprintf aout "\t.cfi_startproc\n";
+    fprintf aout "\tendbr64\n";
+    fprintf aout "\tpushq	%%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_offset 16\n";
+    fprintf aout "\t.cfi_offset 6, -16\n";
+    fprintf aout "\tmovq %%rsp, %%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_register 6\n";
+    fprintf aout "\tmovq %%rdi, -24(%%rbp)\n";
+    fprintf aout "\tmovl $0, -4(%%rbp)\n";
+    fprintf aout "\tjmp .L7\n";
+    fprintf aout ".L8:\n";
+    fprintf aout "\tmovl -4(%%rbp), %%eax\n";
+    fprintf aout "\taddl $1, %%eax\n";
+    fprintf aout "\tmovl %%eax, -4(%%rbp)\n";
+    fprintf aout ".L7:\n";
+    fprintf aout "\tmovl -4(%%rbp), %%eax\n";
+    fprintf aout "\tmovl %%eax, %%edx\n";
+    fprintf aout "\tmovq -24(%%rbp), %%rax\n";
+    fprintf aout "\taddq %%rdx, %%rax\n";
+    fprintf aout "\tmovzbl (%%rax), %%eax\n";
+    fprintf aout "\ttestb %%al, %%al\n";
+    fprintf aout "\tjne .L8\n";
+    fprintf aout "\tmovl -4(%%rbp), %%eax\n";
+    fprintf aout "\tpopq %%rbp\n";
+    fprintf aout "\t.cfi_def_cfa 7, 8\n";
+    fprintf aout "\tret\n";
+    fprintf aout "\t.cfi_endproc\n";
+    fprintf aout ".LFE7:\n";
+    fprintf aout "\t.size	coolstrlen, .-coolstrlen\n";
+    fprintf aout "\t.section	.rodata\n";
 
     (* coolstrcat - copied from ref compiler *)
-    fprintf aout "
-    .LC0:
-	.string	\"%%s%%s\"
-	.text
-.globl coolstrcat
-	.type	coolstrcat, @function
-coolstrcat:
-.LFB2:
-	.cfi_startproc
-	pushq	%%rbp
-	.cfi_def_cfa_offset 16
-	.cfi_offset 6, -16
-	movq	%%rsp, %%rbp
-	.cfi_def_cfa_register 6
-	pushq	%%rbx
-	subq	$40, %%rsp
-	movq	%%rdi, -40(%%rbp)
-	movq	%%rsi, -48(%%rbp)
-	cmpq	$0, -40(%%rbp)
-	jne	.L10
-	.cfi_offset 3, -24
-	movq	-48(%%rbp), %%rax
-	jmp	.L11
-.L10:
-	cmpq	$0, -48(%%rbp)
-	jne	.L12
-	movq	-40(%%rbp), %%rax
-	jmp	.L11
-.L12:
-	movq	-40(%%rbp), %%rax
-	movq	%%rax, %%rdi
-	call	coolstrlen
-	movl	%%eax, %%ebx
-	movq	-48(%%rbp), %%rax
-	movq	%%rax, %%rdi
-	call	coolstrlen
-	leal	(%%rbx,%%rax), %%eax
-	addl	$1, %%eax
-	movl	%%eax, -20(%%rbp)
-	movl	-20(%%rbp), %%eax
-	cltq
-	movl	$1, %%esi
-	movq	%%rax, %%rdi
-	call	calloc
-	movq	%%rax, -32(%%rbp)
-	movl	$.LC0, %%edx
-	movl	-20(%%rbp), %%eax
-	movslq	%%eax, %%rbx
-	movq	-48(%%rbp), %%rsi
-	movq	-40(%%rbp), %%rcx
-	movq	-32(%%rbp), %%rax
-	movq	%%rsi, %%r8
-	movq	%%rbx, %%rsi
-	movq	%%rax, %%rdi
-	movl	$0, %%eax
-	call	snprintf
-	movq	-32(%%rbp), %%rax
-.L11:
-	addq	$40, %%rsp
-	popq	%%rbx
-	leave
-	.cfi_def_cfa 7, 8
-	ret
-	.cfi_endproc
-.LFE2:
-	.size	coolstrcat, .-coolstrcat
-	.section	.rodata
-    ";
+    fprintf aout ".LC0:\n";
+    fprintf aout ".string	\"%%s%%s\"\n";
+    fprintf aout ".text\n";
+    fprintf aout ".globl	coolstrcat\n";
+    fprintf aout ".type	coolstrcat, @function\n";
+    fprintf aout "coolstrcat:\n";
+    fprintf aout ".LFB8:\n";
+    fprintf aout "\t.cfi_startproc\n";
+    fprintf aout "\tendbr64\n";
+    fprintf aout "\tpushq	%%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_offset 16\n";
+    fprintf aout "\t.cfi_offset 6, -16\n";
+    fprintf aout "\tmovq	%%rsp, %%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_register 6\n";
+    fprintf aout "\tpushq	%%rbx\n";
+    fprintf aout "\tsubq	$40, %%rsp\n";
+    fprintf aout "\t.cfi_offset 3, -24\n";
+    fprintf aout "\tmovq	%%rdi, -40(%%rbp)\n";
+    fprintf aout "\tmovq	%%rsi, -48(%%rbp)\n";
+    fprintf aout "\tcmpq	$0, -40(%%rbp)\n";
+    fprintf aout "\tjne	.L11\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
+    fprintf aout "\tjmp	.L12\n";
+    fprintf aout ".L11:\n";
+    fprintf aout "\tcmpq	$0, -48(%%rbp)\n";
+    fprintf aout "\tjne	.L13\n";
+    fprintf aout "\tmovq	-40(%%rbp), %%rax\n";
+    fprintf aout "\tjmp	.L12\n";
+    fprintf aout ".L13:\n";
+    fprintf aout "\tmovq	-40(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tcall	coolstrlen\n";
+    fprintf aout "\tmovl	%%eax, %%ebx\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tcall	coolstrlen\n";
+    fprintf aout "\taddl	%%ebx, %%eax\n";
+    fprintf aout "\taddl	$1, %%eax\n";
+    fprintf aout "\tmovl	%%eax, -28(%%rbp)\n";
+    fprintf aout "\tmovl	-28(%%rbp), %%eax\n";
+    fprintf aout "\tcltq\n";
+    fprintf aout "\tmovl	$1, %%esi\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tcall	calloc@PLT\n";
+    fprintf aout "\tmovq	%%rax, -24(%%rbp)\n";
+    fprintf aout "\tmovl	-28(%%rbp), %%eax\n";
+    fprintf aout "\tmovslq	%%eax, %%rsi\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rcx\n";
+    fprintf aout "\tmovq	-40(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	%%rcx, %%r8\n";
+    fprintf aout "\tmovq	%%rdx, %%rcx\n";
+    fprintf aout "\tleaq	.LC0(%%rip), %%rdx\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tmovl	$0, %%eax\n";
+    fprintf aout "\tcall	snprintf@PLT\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout ".L12:\n";
+    fprintf aout "\tmovq	-8(%%rbp), %%rbx\n";
+    fprintf aout "\tleave\n";
+    fprintf aout "\t.cfi_def_cfa 7, 8\n";
+    fprintf aout "\tret\n";
+    fprintf aout "\t.cfi_endproc\n";
+    fprintf aout ".LFE8:\n";
+    fprintf aout "\t.size	coolstrcat, .-coolstrcat\n";
+
 
     (* coolgetstr - copied from ref compiler *)
-    fprintf aout "
-    .LC1:
-	.string	\"\"
-	.text
-.globl coolgetstr
-	.type	coolgetstr, @function
-coolgetstr:
-.LFB3:
-	.cfi_startproc
-	pushq	%%rbp
-	.cfi_def_cfa_offset 16
-	.cfi_offset 6, -16
-	movq	%%rsp, %%rbp
-	.cfi_def_cfa_register 6
-	subq	$32, %%rsp
-	movl	$1, %%esi
-	movl	$40960, %%edi
-	call	calloc
-	movq	%%rax, -16(%%rbp)
-	movl	$0, -4(%%rbp)
-.L20:
-	movq	stdin(%%rip), %%rax
-	movq	%%rax, %%rdi
-	call	fgetc
-	movl	%%eax, -20(%%rbp)
-	cmpl	$-1, -20(%%rbp)
-	je	.L14
-	cmpl	$10, -20(%%rbp)
-	jne	.L15
-.L14:
-	cmpl	$0, -4(%%rbp)
-	je	.L16
-	movl	$.LC1, %%eax
-	jmp	.L17
-.L16:
-	movq	-16(%%rbp), %%rax
-	jmp	.L17
-.L15:
-	cmpl	$0, -20(%%rbp)
-	jne	.L18
-	movl	$1, -4(%%rbp)
-	jmp	.L20
-.L18:
-	movq	-16(%%rbp), %%rax
-	movq	%%rax, %%rdi
-	call	coolstrlen
-	mov	%%eax, %%eax
-	addq	-16(%%rbp), %%rax
-	movl	-20(%%rbp), %%edx
-	movb	%%dl, (%%rax)
-	jmp	.L20
-.L17:
-	leave
-	.cfi_def_cfa 7, 8
-	ret
-	.cfi_endproc
-.LFE3:
-	.size	coolgetstr, .-coolgetstr
-    ";
+    fprintf aout ".globl	coolgetstr\n";
+    fprintf aout ".type	coolgetstr, @function\n";
+    fprintf aout "coolgetstr:\n";
+    fprintf aout ".LFB9:\n";
+    fprintf aout "\t.cfi_startproc\n";
+    fprintf aout "\tendbr64\n";
+    fprintf aout "\tpushq	%%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_offset 16\n";
+    fprintf aout "\t.cfi_offset 6, -16\n";
+    fprintf aout "\tmovq	%%rsp, %%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_register 6\n";
+    fprintf aout "\tsubq	$32, %%rsp\n";
+    fprintf aout "\tmovq	%%fs:40, %%rax\n";
+    fprintf aout "\tmovq	%%rax, -8(%%rbp)\n";
+    fprintf aout "\txorl	%%eax, %%eax\n";
+    fprintf aout "\tmovq	$0, -32(%%rbp)\n";
+    fprintf aout "\tmovq	$0, -24(%%rbp)\n";
+    fprintf aout "\tmovq	stdin(%%rip), %%rdx\n";
+    fprintf aout "\tleaq	-24(%%rbp), %%rcx\n";
+    fprintf aout "\tleaq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	%%rcx, %%rsi\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tcall	getline@PLT\n";
+    fprintf aout "\tmovq	%%rax, -16(%%rbp)\n";
+    fprintf aout "\tcmpq	$-1, -16(%%rbp)\n";
+    fprintf aout "\tje	.L15\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\ttestq	%%rax, %%rax\n";
+    fprintf aout "\tjne	.L16\n";
+    fprintf aout ".L15:\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tcall	free@PLT\n";
+    fprintf aout "\tmovl	$1, %%edi\n";
+    fprintf aout "\tcall	malloc@PLT\n";
+    fprintf aout "\tmovq	%%rax, -32(%%rbp)\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovb	$0, (%%rax)\n";
+    fprintf aout "\tjmp	.L17\n";
+    fprintf aout ".L16:\n";
+    fprintf aout "\tmovq	-16(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovl	$0, %%esi\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tcall	memchr@PLT\n";
+    fprintf aout "\ttestq	%%rax, %%rax\n";
+    fprintf aout "\tje	.L18\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovb	$0, (%%rax)\n";
+    fprintf aout "\tjmp	.L17\n";
+    fprintf aout ".L18:\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-16(%%rbp), %%rax\n";
+    fprintf aout "\tsubq	$1, %%rax\n";
+    fprintf aout "\taddq	%%rdx, %%rax\n";
+    fprintf aout "\tmovzbl	(%%rax), %%eax\n";
+    fprintf aout "\tcmpb	$10, %%al\n";
+    fprintf aout "\tjne	.L17\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rdx\n";
+    fprintf aout "\tsubq	$1, -16(%%rbp)\n";
+    fprintf aout "\tmovq	-16(%%rbp), %%rax\n";
+    fprintf aout "\taddq	%%rdx, %%rax\n";
+    fprintf aout "\tmovb	$0, (%%rax)\n";
+    fprintf aout ".L17:\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-8(%%rbp), %%rdx\n";
+    fprintf aout "\tsubq	%%fs:40, %%rdx\n";
+    fprintf aout "\tje	.L20\n";
+    fprintf aout "\tcall	__stack_chk_fail@PLT\n";
+    fprintf aout ".L20:\n";
+    fprintf aout "\tleave\n";
+    fprintf aout "\t.cfi_def_cfa 7, 8\n";
+    fprintf aout "\tret\n";
+    fprintf aout "\t.cfi_endproc\n";
+    fprintf aout ".LFE9:\n";
+    fprintf aout "\t.size	coolgetstr, .-coolgetstr\n";
+
 
     (* coolsubstr - copied from ref compiler *)
-    fprintf aout ".globl coolsubstr
-	.type	coolsubstr, @function
-coolsubstr:
-.LFB4:
-	.cfi_startproc
-	pushq	%%rbp
-	.cfi_def_cfa_offset 16
-	.cfi_offset 6, -16
-	movq	%%rsp, %%rbp
-	.cfi_def_cfa_register 6
-	subq	$48, %%rsp
-	movq	%%rdi, -24(%%rbp)
-	movq	%%rsi, -32(%%rbp)
-	movq	%%rdx, -40(%%rbp)
-	movq	-24(%%rbp), %%rax
-	movq	%%rax, %%rdi
-	call	coolstrlen
-	movl	%%eax, -4(%%rbp)
-	cmpq	$0, -32(%%rbp)
-	js	.L22
-	cmpq	$0, -40(%%rbp)
-	js	.L22
-	movq	-40(%%rbp), %%rax
-	movq	-32(%%rbp), %%rdx
-	addq	%%rax, %%rdx
-	movl	-4(%%rbp), %%eax
-	cltq
-	cmpq	%%rax, %%rdx
-	jle	.L23
-.L22:
-	movl	$0, %%eax
-	jmp	.L24
-.L23:
-	movq	-40(%%rbp), %%rdx
-	movq	-32(%%rbp), %%rax
-	addq	-24(%%rbp), %%rax
-	movq	%%rdx, %%rsi
-	movq	%%rax, %%rdi
-	call	strndup
-.L24:
-	leave
-	.cfi_def_cfa 7, 8
-	ret
-	.cfi_endproc
-.LFE4:
-	.size	coolsubstr, .-coolsubstr
-";
+    fprintf aout ".globl	coolsubstr\n";
+    fprintf aout ".type	coolsubstr, @function\n";
+    fprintf aout "coolsubstr:\n";
+    fprintf aout ".LFB10:\n";
+    fprintf aout "\t.cfi_startproc\n";
+    fprintf aout "\tendbr64\n";
+    fprintf aout "\tpushq	%%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_offset 16\n";
+    fprintf aout "\t.cfi_offset 6, -16\n";
+    fprintf aout "\tmovq	%%rsp, %%rbp\n";
+    fprintf aout "\t.cfi_def_cfa_register 6\n";
+    fprintf aout "\tsubq	$48, %%rsp\n";
+    fprintf aout "\tmovq	%%rdi, -24(%%rbp)\n";
+    fprintf aout "\tmovq	%%rsi, -32(%%rbp)\n";
+    fprintf aout "\tmovq	%%rdx, -40(%%rbp)\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	%%rax, %%rdi\n";
+    fprintf aout "\tcall	coolstrlen\n";
+    fprintf aout "\tmovl	%%eax, -4(%%rbp)\n";
+    fprintf aout "\tcmpq	$0, -32(%%rbp)\n";
+    fprintf aout "\tjs	.L22\n";
+    fprintf aout "\tcmpq	$0, -40(%%rbp)\n";
+    fprintf aout "\tjs	.L22\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-40(%%rbp), %%rax\n";
+    fprintf aout "\taddq	%%rax, %%rdx\n";
+    fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
+    fprintf aout "\tcltq\n";
+    fprintf aout "\tcmpq	%%rax, %%rdx\n";
+    fprintf aout "\tjle	.L23\n";
+    fprintf aout ".L22:\n";
+    fprintf aout "\tmovl	$0, %%eax\n";
+    fprintf aout "\tjmp	.L24\n";
+    fprintf aout ".L23:\n";
+    fprintf aout "\tmovq	-40(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rcx\n";
+    fprintf aout "\tmovq	-24(%%rbp), %%rdx\n";
+    fprintf aout "\taddq	%%rcx, %%rdx\n";
+    fprintf aout "\tmovq	%%rax, %%rsi\n";
+    fprintf aout "\tmovq	%%rdx, %%rdi\n";
+    fprintf aout "\tcall	strndup@PLT\n";
+    fprintf aout ".L24:\n";
+    fprintf aout "\tleave\n";
+    fprintf aout "\t.cfi_def_cfa 7, 8\n";
+    fprintf aout "\tret\n";
+    fprintf aout "\t.cfi_endproc\n";
+    fprintf aout ".LFE10:\n";
+    fprintf aout "\t.size	coolsubstr, .-coolsubstr\n";
+
 
     fprintf aout "\n## INTERNAL METHOD BODIES END\n";
 
@@ -1576,19 +1607,23 @@ coolsubstr:
     (* print out program start *)
 
     fprintf aout "\n## PROGRAM BEGINS HERE\n";
-    fprintf aout ".globl start\nstart:\n\t.globl main\n\t.type main, @function\n";
+    fprintf aout ".globl start\n";
+    fprintf aout "start:\n";
+    fprintf aout ".globl main\n";
+    fprintf aout ".type main, @function\n";
     fprintf aout "main:\n";
-    fprintf aout "
-movq $Main..new, %%r14
-pushq %%rbp
-call *%%r14
-pushq %%rbp
-pushq %%r13
-movq $Main.main, %%r14
-call *%%r14
-movl $0, %%edi
-call exit
-    ";
+    fprintf aout "\tmovq $Main..new, %%r14\n";
+    fprintf aout "\tpushq %%rbp\n";
+    fprintf aout "\tcall *%%r14\n";
+    fprintf aout "\tpushq %%rbp\n";
+    fprintf aout "\tpushq %%r13\n";
+    fprintf aout "\tmovq $Main.main, %%r14\n";
+    fprintf aout "\tcall *%%r14\n";
+    fprintf aout "\t## guarantee 16-byte alignment before call\n";
+    fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+    fprintf aout "\tmovl $0, %%edi\n";
+    fprintf aout "\tcall exit\n";
+
   )
 ) ;;
 

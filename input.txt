@@ -1,0 +1,16 @@
+.globl start
+start:                  ## program begins here
+                        .globl main
+			.type main, @function
+main:
+                        movq $Main..new, %r14
+                        pushq %rbp
+                        call *%r14
+                        pushq %rbp
+                        pushq %r13
+                        movq $Main.main, %r14
+                        call *%r14
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movl $0, %edi
+			call exit
