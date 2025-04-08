@@ -106,6 +106,7 @@ let varCount = ref 0;;
 let labelCount = ref 1;;
 
 let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
+let envtable : (string, int) Hashtbl.t = Hashtbl.create 255
 
 let main() = (
   let fname = Sys.argv.(1) in 
@@ -524,8 +525,8 @@ let main() = (
         let elselbl = fresh_label cname mname in 
         let joinlbl = fresh_label cname mname in 
         let pinstr, pexp = convert pred.exp_kind (thenvar) cname mname in 
-        let notc = TAC_Assign_BoolNegate(elsevar, pexp) in
-        let bt = TAC_Branch_True(thenvar, thenlbl) in
+        (* let notc = TAC_Assign_BoolNegate(elsevar, pexp) in *)
+        (* let bt = TAC_Branch_True(thenvar, thenlbl) in *)
         let be = TAC_Branch_True(elsevar, elselbl) in 
         let tcomm = TAC_Comment("then branch") in 
         let tlbl = TAC_Label(thenlbl) in
@@ -537,7 +538,7 @@ let main() = (
         let tinstr, texp = convert astthen.exp_kind (var) cname mname in 
         let einstr, eexp = convert astelse.exp_kind (var) cname mname in 
 
-        pinstr @ [notc] @ [be] @ [bt] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
+        pinstr (* @ [notc] *) @ [be] (* @ [bt]  *)@ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
         let predvar = fresh_var() in 
         let predlblname = fresh_label cname mname in 
@@ -639,7 +640,7 @@ let main() = (
         | _ -> -1
         in
         fprintf fout "\tmovq $%d, 24(%%r13)\n" bool_int;
-        fprintf fout "\tmovq 24(%%r13), %%r13\n";
+        (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
         fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
         stackOffset := !stackOffset -8;
       | TAC_Assign_String(var, i) ->
@@ -680,22 +681,41 @@ let main() = (
         fprintf fout "\tmovq 24(%%r14), %%r14\n";
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
         fprintf fout "\tmovq 24(%%r15), %%rax\n";
-        fprintf fout "\tmovq %d(%%rbp), %%rax\n" !stackOffset;
+        fprintf fout "\tmovq $0, %%rdx\n";
         fprintf fout "\tcqto\n";
         fprintf fout "\tidivq %%r14\n";
+        fprintf fout "\tpushq %%rax\n";
         call_new fout "Int";
+        fprintf fout "\tpopq %%rax\n";
         fprintf fout "\tmovq %%rax, 24(%%r13)\n";
         fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
       | TAC_Assign_Lt(var, i1, i2) ->
-        fprintf fout "%s <- < %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+        stackOffset := !stackOffset +8;
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+        fprintf fout "\tmovq 24(%%r14), %%r14\n";
+        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+        fprintf fout "\tmovq 24(%%r15), %%r15\n";
+        fprintf fout "\tpushq %%r14\n";
+        fprintf fout "\tpushq %%r15\n";
+        fprintf fout "\tcall lt_handler\n";
+        fprintf fout "\taddq $24, %%rsp\n";
+        fprintf fout "\tpushq %%rax\n";
+        call_new fout "Bool";
+        fprintf fout "\tpopq %%rax\n";
+        fprintf fout "\tmovq %%rax, 24(%%r13)\n";
+        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
       | TAC_Assign_Le(var, i1, i2) ->
         fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
       | TAC_Assign_Eq(var, i1, i2) ->
         fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
       | TAC_Assign_ArithNegate(var, i) ->
-        fprintf fout "%s <- ~ %s\n" var (tac_expr_to_name i)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
+        fprintf fout "\tnegq 24(%%r14)\n";
+        fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
       | TAC_Assign_BoolNegate(var, i) ->
-        fprintf fout "%s <- not %s\n" var (tac_expr_to_name i)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
+        fprintf fout "\txorq $1, 24(%%r14)\n";
+        fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
       | TAC_Assign_NullCheck(var, i) ->
         fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
       | TAC_Assign_FunctionCall(var, mname, None) ->
@@ -720,13 +740,15 @@ let main() = (
       | TAC_Assign_Assign(var, i) ->
         fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
       | TAC_Branch_True(cond, label) -> 
-        fprintf fout "bt %s %s\n" cond label; 
+        fprintf fout "\tcmpq $0, 24(%%r13)\n";
+        fprintf fout "\tje %s\n" label;
       | TAC_Comment(comment) ->
         fprintf fout "## %s\n" comment;
       | TAC_Jump(label) -> 
-        fprintf fout "jmp %s\n" label;
+        fprintf fout "\tjmp %s\n" label;
       | TAC_Label(label) ->
-        fprintf fout "label %s\n" label
+        fprintf fout ".globl %s\n" label;
+        fprintf fout "%s:\n" label
       | TAC_Return(label) ->
         fprintf fout "ret\n"
       | _ -> fprintf fout ""
@@ -1381,6 +1403,22 @@ coolsubstr:
     Hashtbl.iter (fun cname sname -> (
       print_asm_string aout sname cname
     )) asm_strings;
+
+    (* print out comparison handlers *)
+    fprintf aout "\n## LT_HANDLER\n";
+    fprintf aout ".globl lt_handler\nlt_handler:\n";
+    fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+    fprintf aout "\tmovq 24(%%rbp), %%r14\n"; (* second argument *)
+    fprintf aout "\tmovq 16(%%rbp), %%r15\n"; (* first argument *)
+    fprintf aout "\tcmpq %%r14, %%r15\n";
+    fprintf aout "\tjl lt_true\n";
+    fprintf aout "\tmovq $0, %%rax\n";
+    fprintf aout "\tjmp lt_handler_end\n";
+    fprintf aout ".globl lt_true\nlt_true:\n";
+    fprintf aout "\tmovq $1, %%rax\n";
+    fprintf aout "\tjmp lt_handler_end\n";
+    fprintf aout ".globl lt_handler_end\nlt_handler_end:\n";
+    fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
 
     (* print out program start *)
 
