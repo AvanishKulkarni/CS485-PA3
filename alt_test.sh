@@ -8,5 +8,5 @@ fname="${input%.*}"
 
 cool --type "$fname.cl"
 ./main "$fname.cl-type"
-gcc "file.s" --static --no-pie 
+gcc "$fname.s" --static --no-pie 
 ./a.out

@@ -3,7 +3,7 @@
 *.s
 wip/*
 test.cl
-
+a.out
 *.annot
 *.cmo
 *.cma
