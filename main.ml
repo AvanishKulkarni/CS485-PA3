@@ -44,6 +44,13 @@ and label = string
 and iconst = string
 and bconst = string 
 and sconst = string
+and cfg_node = {
+  label: tac_instr;
+  comment: tac_instr;
+  mutable blocks: tac_instr list;
+  mutable true_branch: cfg_node option;
+  mutable false_branch: cfg_node option;
+}
 
 let tac_expr_to_name t = match t with TAC_Variable c -> c
 
@@ -355,6 +362,23 @@ let main() = (
       (sprintf "%s_%s_%d" cname mname !labelCount) in labelCount := !labelCount + 1;
       newLabel
   ) in
+  let currNode : cfg_node ref = ref {
+    label = TAC_Label("");
+    comment = TAC_Comment("");
+    blocks = [];
+    true_branch = None;
+    false_branch = None;
+  } in
+  let rec merge_node curr_node = (
+    match curr_node with
+    | Some(curr_node) -> (
+      match curr_node.true_branch with
+      | None -> curr_node.true_branch <- Some(!currNode);
+      | Some(node_branch) -> merge_node (Some(node_branch));
+    )
+    | None -> ();
+  )
+    in
   let ident_tac : (name, (tac_expr)) Hashtbl.t = Hashtbl.create 255 in
   let rec convert (a: exp_kind) (var : name) (cname: name) (mname: name) : (tac_instr list * tac_expr) = (
     match a with
@@ -364,16 +388,21 @@ let main() = (
         (match Hashtbl.find_opt ident_tac name with 
         | Some(ta) -> 
           (* printf "found -> returning %s\n" (tac_expr_to_name ta); *)
+          !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, (tac_expr_to_name ta))];
           [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
         | None -> 
           (* printf "created %s \n" name; *)
           Hashtbl.add ident_tac name (TAC_Variable(var));
+          !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, name)];
           [TAC_Assign_Identifier(var, name)], TAC_Variable(var))
       | Integer(i) ->
+        !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Int(var, string_of_int i)];
         [TAC_Assign_Int(var, string_of_int i)], (TAC_Variable(var))
       | Bool(i) ->
+        !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Bool(var, i)];
         [TAC_Assign_Bool(var, i)], (TAC_Variable(var))
       | String(i) ->
+        !currNode.blocks <- !currNode.blocks @ [TAC_Assign_String(var, i)];
         [TAC_Assign_String(var, i)], (TAC_Variable(var))
       | Plus(a1, a2) ->
         let arg1 = fresh_var () in
@@ -381,6 +410,7 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Plus(var, ta1, ta2) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Minus(a1, a2) ->
         let arg1 = fresh_var () in
@@ -388,6 +418,7 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Minus(var, ta1, ta2) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Times(a1, a2) -> 
         let arg1 = fresh_var () in
@@ -395,6 +426,7 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Times(var, ta1, ta2) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Divide(a1, a2) -> 
         let arg1 = fresh_var () in
@@ -402,6 +434,7 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Div(var, ta1, ta2) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Lt(a1, a2) ->
         let arg1 = fresh_var () in
@@ -409,6 +442,7 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Lt(var, ta1, ta2) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Le(a1, a2) ->
         let arg1 = fresh_var () in
@@ -416,6 +450,7 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Le(var, ta1, ta2) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Eq(a1, a2) ->
         let arg1 = fresh_var () in
@@ -423,18 +458,22 @@ let main() = (
         let i1, ta1 = convert a1.exp_kind arg1 cname mname in
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Eq(var, ta1, ta2) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Not(a1) ->
         let i1, ta1 = convert a1.exp_kind (fresh_var()) cname mname in
         let to_output = TAC_Assign_BoolNegate(var, ta1) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ [to_output]), (TAC_Variable(var))
       | Negate(a1) ->
         let i1, ta1 = convert a1.exp_kind (fresh_var()) cname mname in
         let to_output = TAC_Assign_ArithNegate(var, ta1) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ [to_output]), (TAC_Variable(var))
       | Isvoid(a1) ->
         let i1, ta1 = convert a1.exp_kind (fresh_var()) cname mname in
         let to_output = TAC_Assign_NullCheck(var, ta1) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i1 @ [to_output]), (TAC_Variable(var))
       | Block(exp) ->
         let retTacInstr = ref [] in
@@ -467,6 +506,7 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let to_output = TAC_Assign_Self_FunctionCall(var, mname, cname, Some(!args_vars)) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ [to_output]), TAC_Variable(var)
       | Static_Dispatch(caller, _, (_, mname), args) ->
         let retTacInstr = ref [] in
@@ -480,6 +520,7 @@ let main() = (
         let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
+        !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
         let retTacInstr = ref [] in
@@ -500,6 +541,7 @@ let main() = (
                 let var = fresh_var () in
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Default(var, typename)];
+                !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Default(var, typename)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
                 (* Hashtbl.add ident_tac vname (TAC_Variable(var)) *)
               )
@@ -516,6 +558,7 @@ let main() = (
         (* Hashtbl.add ident_tac name (TAC_Variable(var)); *)
         let i, ta = convert exp.exp_kind (fresh_var ())cname mname in
         let to_output = TAC_Assign_Assign((tac_expr_to_name tac_var), ta) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (i @ [to_output]), (tac_var)
       (* Need to finish rest of tac for objects and conditionals*)
       | If (pred, astthen, astelse) -> 
@@ -535,9 +578,39 @@ let main() = (
         let jcomm = TAC_Comment("if-join") in 
         let jlbl = TAC_Label(joinlbl) in 
         let jjmp = TAC_Jump(joinlbl) in 
+        !currNode.blocks <- !currNode.blocks @ [be];
+        let prevNode : cfg_node = !currNode in
+        (* true node*)
+        currNode := {
+          label = tlbl;
+          comment = tcomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+        };
         let tinstr, texp = convert astthen.exp_kind (var) cname mname in 
+        !currNode.blocks <- !currNode.blocks @ [jjmp];
+        prevNode.true_branch <- Some(!currNode);
+        (* false node *)
+        currNode := {
+          label = elbl;
+          comment = ecomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+        };
         let einstr, eexp = convert astelse.exp_kind (var) cname mname in 
-
+        !currNode.blocks <- !currNode.blocks @ [jjmp];
+        prevNode.false_branch <- Some(!currNode);
+        (* merge node *)
+        currNode := {
+          label = jlbl;
+          comment = jcomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+        };
+        merge_node (prevNode.false_branch);
         pinstr (* @ [notc] *) @ [be] (* @ [bt]  *)@ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
         let predvar = fresh_var() in 
@@ -621,141 +694,155 @@ let main() = (
   in
   (* convert TAC instructions into asm *)
   let stackOffset = ref 0 in
-  let tac_to_asm fout tac_instructions = (
-    List.iter ( fun x ->
-      match x with
-      | TAC_Assign_Identifier(var, i) ->
-          fprintf fout "%s <- %s\n" var i
-      | TAC_Assign_Int(var, i) ->
-        call_new fout "Int";
-        fprintf fout "\tmovq $%s, 24(%%r13)\n" i;
-        (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
-        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
-        stackOffset := !stackOffset -8;
-      | TAC_Assign_Bool(var, i) ->
-        call_new fout "Bool";
-        let bool_int = match i with 
-        | "true" -> 1
-        | "false" -> 0 
-        | _ -> -1
-        in
-        fprintf fout "\tmovq $%d, 24(%%r13)\n" bool_int;
-        (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
-        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
-        stackOffset := !stackOffset -8;
-      | TAC_Assign_String(var, i) ->
-        fprintf fout "%s <- string\n%s\n" var i
-      | TAC_Assign_Plus(var, i1, i2) ->
-        stackOffset := !stackOffset +8;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-        fprintf fout "\tmovq 24(%%r14), %%r14\n";
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-        fprintf fout "\tmovq 24(%%r15), %%r15\n";
-        fprintf fout "\taddq %%r14, %%r15\n";
-        call_new fout "Int";
-        fprintf fout "\tmovq %%r15, 24(%%r13)\n";
-        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
-      | TAC_Assign_Minus(var, i1, i2) ->
-        stackOffset := !stackOffset +8;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-        fprintf fout "\tmovq 24(%%r14), %%r14\n";
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-        fprintf fout "\tmovq 24(%%r15), %%r15\n";
-        fprintf fout "\tsubq %%r14, %%r15\n";
-        call_new fout "Int";
-        fprintf fout "\tmovq %%r15, 24(%%r13)\n";
-        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
-      | TAC_Assign_Times(var, i1, i2) ->
-        stackOffset := !stackOffset +8;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-        fprintf fout "\tmovq 24(%%r14), %%r14\n";
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-        fprintf fout "\tmovq 24(%%r15), %%r15\n";
-        fprintf fout "\timulq %%r14, %%r15\n";
-        call_new fout "Int";
-        fprintf fout "\tmovq %%r15, 24(%%r13)\n";
-        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
-      | TAC_Assign_Div(var, i1, i2) ->
-        stackOffset := !stackOffset +8;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-        fprintf fout "\tmovq 24(%%r14), %%r14\n";
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-        fprintf fout "\tmovq 24(%%r15), %%rax\n";
-        fprintf fout "\tmovq $0, %%rdx\n";
-        fprintf fout "\tcqto\n";
-        fprintf fout "\tidivq %%r14\n";
-        fprintf fout "\tpushq %%rax\n";
-        call_new fout "Int";
-        fprintf fout "\tpopq %%rax\n";
-        fprintf fout "\tmovq %%rax, 24(%%r13)\n";
-        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
-      | TAC_Assign_Lt(var, i1, i2) ->
-        stackOffset := !stackOffset +8;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-        fprintf fout "\tmovq 24(%%r14), %%r14\n";
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-        fprintf fout "\tmovq 24(%%r15), %%r15\n";
-        fprintf fout "\tpushq %%r14\n";
-        fprintf fout "\tpushq %%r15\n";
-        fprintf fout "\tcall lt_handler\n";
-        fprintf fout "\taddq $24, %%rsp\n";
-        fprintf fout "\tpushq %%rax\n";
-        call_new fout "Bool";
-        fprintf fout "\tpopq %%rax\n";
-        fprintf fout "\tmovq %%rax, 24(%%r13)\n";
-        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
-      | TAC_Assign_Le(var, i1, i2) ->
-        fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
-      | TAC_Assign_Eq(var, i1, i2) ->
-        fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
-      | TAC_Assign_ArithNegate(var, i) ->
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
-        fprintf fout "\tnegq 24(%%r14)\n";
-        fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
-      | TAC_Assign_BoolNegate(var, i) ->
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
-        fprintf fout "\txorq $1, 24(%%r14)\n";
-        fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
-      | TAC_Assign_NullCheck(var, i) ->
-        fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
-      | TAC_Assign_FunctionCall(var, mname, None) ->
-        fprintf fout "%s <- call %s\n" var mname;
-      | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
-        fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
-      | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
-        fprintf fout "\tpushq %%r12\n";
-        fprintf fout "\tpushq %%rbp\n";
-        List.iteri (fun i _ -> fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset + 8*(i+1))) args_vars;
-        fprintf fout "\tpushq %%r12\n";
-        fprintf fout "\tmovq 16(%%r12), %%r14\n";
-        fprintf fout "\tmovq %d(%%r14), %%r14\n" (Hashtbl.find vtable (cname, mname));
-        fprintf fout "\tcall *%%r14\n";
-        fprintf fout "\taddq $%d, %%rsp\n" (8+ 8*List.length args_vars);
-        fprintf fout "\tpopq %%rbp\n";
-        fprintf fout "\tpopq %%r12\n";
-      | TAC_Assign_New(var, name) ->
-        fprintf fout "%s <- new %s\n" var name
-      | TAC_Assign_Default(var, name) ->
-        fprintf fout "%s <- default %s\n" var name;
-      | TAC_Assign_Assign(var, i) ->
-        fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
-      | TAC_Branch_True(cond, label) -> 
-        fprintf fout "\tcmpq $0, 24(%%r13)\n";
-        fprintf fout "\tje %s\n" label;
-      | TAC_Comment(comment) ->
-        fprintf fout "## %s\n" comment;
-      | TAC_Jump(label) -> 
-        fprintf fout "\tjmp %s\n" label;
-      | TAC_Label(label) ->
-        fprintf fout ".globl %s\n" label;
-        fprintf fout "%s:\n" label
-      | TAC_Return(label) ->
-        fprintf fout "ret\n"
-      | _ -> fprintf fout ""
-
-    ) tac_instructions;
+  let tac_to_asm fout tac_instruction = (
+    match tac_instruction with
+    | TAC_Assign_Identifier(var, i) ->
+        fprintf fout "%s <- %s\n" var i
+    | TAC_Assign_Int(var, i) ->
+      call_new fout "Int";
+      fprintf fout "\tmovq $%s, 24(%%r13)\n" i;
+      (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
+      stackOffset := !stackOffset -8;
+    | TAC_Assign_Bool(var, i) ->
+      call_new fout "Bool";
+      let bool_int = match i with 
+      | "true" -> 1
+      | "false" -> 0 
+      | _ -> -1
+      in
+      fprintf fout "\tmovq $%d, 24(%%r13)\n" bool_int;
+      (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
+      stackOffset := !stackOffset -8;
+    | TAC_Assign_String(var, i) ->
+      fprintf fout "%s <- string\n%s\n" var i
+    | TAC_Assign_Plus(var, i1, i2) ->
+      stackOffset := !stackOffset +8;
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq 24(%%r15), %%r15\n";
+      fprintf fout "\taddq %%r14, %%r15\n";
+      call_new fout "Int";
+      fprintf fout "\tmovq %%r15, 24(%%r13)\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+    | TAC_Assign_Minus(var, i1, i2) ->
+      stackOffset := !stackOffset +8;
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq 24(%%r15), %%r15\n";
+      fprintf fout "\tsubq %%r14, %%r15\n";
+      call_new fout "Int";
+      fprintf fout "\tmovq %%r15, 24(%%r13)\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+    | TAC_Assign_Times(var, i1, i2) ->
+      stackOffset := !stackOffset +8;
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq 24(%%r15), %%r15\n";
+      fprintf fout "\timulq %%r14, %%r15\n";
+      call_new fout "Int";
+      fprintf fout "\tmovq %%r15, 24(%%r13)\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+    | TAC_Assign_Div(var, i1, i2) ->
+      stackOffset := !stackOffset +8;
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq 24(%%r15), %%rax\n";
+      fprintf fout "\tmovq $0, %%rdx\n";
+      fprintf fout "\tcqto\n";
+      fprintf fout "\tidivq %%r14\n";
+      fprintf fout "\tpushq %%rax\n";
+      call_new fout "Int";
+      fprintf fout "\tpopq %%rax\n";
+      fprintf fout "\tmovq %%rax, 24(%%r13)\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+    | TAC_Assign_Lt(var, i1, i2) ->
+      stackOffset := !stackOffset +8;
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq 24(%%r15), %%r15\n";
+      fprintf fout "\tpushq %%r14\n";
+      fprintf fout "\tpushq %%r15\n";
+      fprintf fout "\tcall lt_handler\n";
+      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\tpushq %%rax\n";
+      call_new fout "Bool";
+      fprintf fout "\tpopq %%rax\n";
+      fprintf fout "\tmovq %%rax, 24(%%r13)\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+    | TAC_Assign_Le(var, i1, i2) ->
+      fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+    | TAC_Assign_Eq(var, i1, i2) ->
+      fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+    | TAC_Assign_ArithNegate(var, i) ->
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
+      fprintf fout "\tnegq 24(%%r14)\n";
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
+    | TAC_Assign_BoolNegate(var, i) ->
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
+      fprintf fout "\txorq $1, 24(%%r14)\n";
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
+    | TAC_Assign_NullCheck(var, i) ->
+      fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
+    | TAC_Assign_FunctionCall(var, mname, None) ->
+      fprintf fout "%s <- call %s\n" var mname;
+    | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
+      fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
+    | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
+      fprintf fout "\tpushq %%r12\n";
+      fprintf fout "\tpushq %%rbp\n";
+      List.iteri (fun i _ -> fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset + 8*(i+1))) args_vars;
+      fprintf fout "\tpushq %%r12\n";
+      fprintf fout "\tmovq 16(%%r12), %%r14\n";
+      fprintf fout "\tmovq %d(%%r14), %%r14\n" (Hashtbl.find vtable (cname, mname));
+      fprintf fout "\tcall *%%r14\n";
+      fprintf fout "\taddq $%d, %%rsp\n" (8+ 8*List.length args_vars);
+      fprintf fout "\tpopq %%rbp\n";
+      fprintf fout "\tpopq %%r12\n";
+    | TAC_Assign_New(var, name) ->
+      fprintf fout "%s <- new %s\n" var name
+    | TAC_Assign_Default(var, name) ->
+      fprintf fout "%s <- default %s\n" var name;
+    | TAC_Assign_Assign(var, i) ->
+      fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
+    | TAC_Branch_True(cond, label) -> 
+      fprintf fout "\tcmpq $0, 24(%%r13)\n";
+      fprintf fout "\tje %s\n" label;
+    | TAC_Comment(comment) ->
+      fprintf fout "## %s\n" comment;
+    | TAC_Jump(label) -> 
+      fprintf fout "\tjmp %s\n" label;
+    | TAC_Label(label) ->
+      fprintf fout ".globl %s\n" label;
+      fprintf fout "%s:\n" label
+    | TAC_Return(label) ->
+      fprintf fout "ret\n"
+    | _ -> fprintf fout ""
   )
   in
+  let visitedNodes = ref [] in
+  let rec output_asm fout cfgNode = (
+    match cfgNode with
+    | None -> ();
+    | Some(cfgNode) -> 
+      if not(List.mem cfgNode.label !visitedNodes) then (
+        visitedNodes :=  cfgNode.label :: !visitedNodes;
+        tac_to_asm fout cfgNode.comment;
+        tac_to_asm fout cfgNode.label;
+        List.iter ( fun x ->
+          tac_to_asm fout x;
+        ) cfgNode.blocks;
+        output_asm fout cfgNode.true_branch;
+        output_asm fout cfgNode.false_branch;
+      )
+  )
+in
   let asmname = Filename.chop_extension fname ^ ".s" in
   let aout = open_out asmname in 
   let print_calloc fout nmemb msize = (
@@ -864,10 +951,18 @@ let main() = (
         let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
         fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
         fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 8);
-
+        let node : cfg_node = {
+          label = TAC_Internal("");
+          comment = TAC_Comment("start");
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+        }
+        in
+        currNode := node;
         (* TODO find the AST for the method and then run it *)      
-        let tac_instructions, tac_var = convert body.exp_kind (fresh_var()) cname mname in
-        tac_to_asm aout tac_instructions;
+        let _, _ = convert body.exp_kind (fresh_var()) cname mname in
+        output_asm aout (Some(node));
 
         fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
       )) non_inherited_methods;
