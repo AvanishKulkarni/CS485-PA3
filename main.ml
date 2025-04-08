@@ -776,9 +776,35 @@ let main() = (
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_Le(var, i1, i2) ->
-      fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      stackOffset := !stackOffset +8;
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq 24(%%r15), %%r15\n";
+      fprintf fout "\tpushq %%r14\n";
+      fprintf fout "\tpushq %%r15\n";
+      fprintf fout "\tcall le_handler\n";
+      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\tpushq %%rax\n";
+      call_new fout "Bool";
+      fprintf fout "\tpopq %%rax\n";
+      fprintf fout "\tmovq %%rax, 24(%%r13)\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_Eq(var, i1, i2) ->
-      fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      stackOffset := !stackOffset +8;
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq 24(%%r15), %%r15\n";
+      fprintf fout "\tpushq %%r14\n";
+      fprintf fout "\tpushq %%r15\n";
+      fprintf fout "\tcall eq_handler\n";
+      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\tpushq %%rax\n";
+      call_new fout "Bool";
+      fprintf fout "\tpopq %%rax\n";
+      fprintf fout "\tmovq %%rax, 24(%%r13)\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_ArithNegate(var, i) ->
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
       fprintf fout "\tnegq 24(%%r14)\n";
@@ -1499,7 +1525,7 @@ coolsubstr:
       print_asm_string aout sname cname
     )) asm_strings;
 
-    (* print out comparison handlers *)
+    (* print out less than handler *)
     fprintf aout "\n## LT_HANDLER\n";
     fprintf aout ".globl lt_handler\nlt_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
@@ -1513,6 +1539,38 @@ coolsubstr:
     fprintf aout "\tmovq $1, %%rax\n";
     fprintf aout "\tjmp lt_handler_end\n";
     fprintf aout ".globl lt_handler_end\nlt_handler_end:\n";
+    fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+
+    (* print out less than or equal to handler *)
+    fprintf aout "\n## LE_HANDLER\n";
+    fprintf aout ".globl le_handler\nle_handler:\n";
+    fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+    fprintf aout "\tmovq 24(%%rbp), %%r14\n"; (* second argument *)
+    fprintf aout "\tmovq 16(%%rbp), %%r15\n"; (* first argument *)
+    fprintf aout "\tcmpq %%r14, %%r15\n";
+    fprintf aout "\tjle le_true\n";
+    fprintf aout "\tmovq $0, %%rax\n";
+    fprintf aout "\tjmp le_handler_end\n";
+    fprintf aout ".globl le_true\nle_true:\n";
+    fprintf aout "\tmovq $1, %%rax\n";
+    fprintf aout "\tjmp le_handler_end\n";
+    fprintf aout ".globl le_handler_end\nle_handler_end:\n";
+    fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+
+    (* print out equal handler *)
+    fprintf aout "\n## EQ_HANDLER\n";
+    fprintf aout ".globl eq_handler\neq_handler:\n";
+    fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+    fprintf aout "\tmovq 24(%%rbp), %%r14\n"; (* second argument *)
+    fprintf aout "\tmovq 16(%%rbp), %%r15\n"; (* first argument *)
+    fprintf aout "\tcmpq %%r14, %%r15\n";
+    fprintf aout "\tje eq_true\n";
+    fprintf aout "\tmovq $0, %%rax\n";
+    fprintf aout "\tjmp eq_handler_end\n";
+    fprintf aout ".globl eq_true\neq_true:\n";
+    fprintf aout "\tmovq $1, %%rax\n";
+    fprintf aout "\tjmp eq_handler_end\n";
+    fprintf aout ".globl eq_handler_end\neq_handler_end:\n";
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
 
     (* print out program start *)
