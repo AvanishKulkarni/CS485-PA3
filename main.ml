@@ -693,8 +693,7 @@ let main() = (
   )
   in
   (* convert TAC instructions into asm *)
-  let stackOffset = ref 0 in
-  let tac_to_asm fout tac_instruction = (
+  let tac_to_asm fout stackOffset tac_instruction = (
     match tac_instruction with
     | TAC_Assign_Identifier(var, i) ->
         fprintf fout "%s <- %s\n" var i
@@ -827,19 +826,20 @@ let main() = (
   )
   in
   let visitedNodes = ref [] in
-  let rec output_asm fout cfgNode = (
+  let rec output_asm fout stackOffset cfgNode = (
     match cfgNode with
     | None -> ();
     | Some(cfgNode) -> 
       if not(List.mem cfgNode.label !visitedNodes) then (
         visitedNodes :=  cfgNode.label :: !visitedNodes;
-        tac_to_asm fout cfgNode.comment;
-        tac_to_asm fout cfgNode.label;
+        tac_to_asm fout stackOffset cfgNode.comment;
+        tac_to_asm fout stackOffset cfgNode.label;
         List.iter ( fun x ->
-          tac_to_asm fout x;
+          tac_to_asm fout stackOffset x;
         ) cfgNode.blocks;
-        output_asm fout cfgNode.true_branch;
-        output_asm fout cfgNode.false_branch;
+        let trueOffset, falseOffset = ref !stackOffset, ref !stackOffset in
+        output_asm fout trueOffset cfgNode.true_branch;
+        output_asm fout falseOffset cfgNode.false_branch;
       )
   )
 in
@@ -962,7 +962,7 @@ in
         currNode := node;
         (* TODO find the AST for the method and then run it *)      
         let _, _ = convert body.exp_kind (fresh_var()) cname mname in
-        output_asm aout (Some(node));
+        output_asm aout (ref 0) (Some(node));
 
         fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
       )) non_inherited_methods;
