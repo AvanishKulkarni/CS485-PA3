@@ -30,7 +30,7 @@ type tac_instr =
   | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list) option
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
-  | TAC_Assign_Let of label * tac_expr list
+  | TAC_Remove_Let of label
   | TAC_Assign_Assign of label * tac_expr
   | TAC_Branch_True of bconst * label
   | TAC_Comment of string
@@ -527,6 +527,7 @@ let main() = (
       | Let(bindlist, let_body) ->
         let retTacInstr = ref [] in
         let let_vars = ref [] in
+        let removeScope = ref [] in
         List.iter
             (fun (Binding ((_, vname), (_, typename), binit)) ->
               match binit with
@@ -537,6 +538,7 @@ let main() = (
                 let i, ta = convert binit.exp_kind (var) cname mname in
                 retTacInstr := List.append !retTacInstr i;
                 let_vars := List.append !let_vars [ta];
+                removeScope := List.append !removeScope [TAC_Remove_Let(var)];
                 (* Hashtbl.add ident_tac vname (ta) *)
               (* [Let-No-Init] *)
               | None -> 
@@ -545,6 +547,7 @@ let main() = (
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Default(var, typename)];
                 !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Default(var, typename)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
+                removeScope := List.append !removeScope [TAC_Remove_Let(var)];
                 (* Hashtbl.add ident_tac vname (TAC_Variable(var)) *)
               )
             bindlist;
@@ -554,7 +557,7 @@ let main() = (
               Hashtbl.remove ident_tac vname;
               )
             bindlist;
-        (!retTacInstr @ i), TAC_Variable(var)
+        (!retTacInstr @ i @ !removeScope), TAC_Variable(var)
       | Assign((_, name), exp) ->
         let tac_var = Hashtbl.find ident_tac name in
         (* Hashtbl.add ident_tac name (TAC_Variable(var)); *)
@@ -664,16 +667,16 @@ let main() = (
       ) 0 exp
     | Dynamic_Dispatch(caller, (_, mname), args) -> 
       max (numTemps caller.exp_kind) (
-      List.fold_left (fun acc e ->
+      1+List.fold_left (fun acc e ->
         max acc (numTemps e.exp_kind)
       ) 0 args)
     | Self_Dispatch((_,mname), args) -> 
-      List.fold_left (fun acc e ->
+      1+List.fold_left (fun acc e ->
         max acc (numTemps e.exp_kind)
       ) 0 args
     | Static_Dispatch(caller, _, (_, mname), args) -> 
       max (numTemps caller.exp_kind) (
-      List.fold_left (fun acc e ->
+      1+List.fold_left (fun acc e ->
         max acc (numTemps e.exp_kind)
       ) 0 args)
     | New((_, name)) -> 0
@@ -713,6 +716,9 @@ let main() = (
           fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
         );
       ); *)
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
+      stackOffset := !stackOffset -8;
       fprintf fout "";
     | TAC_Assign_Int(var, i) ->
       call_new fout "Int";
@@ -862,10 +868,10 @@ let main() = (
     | TAC_Assign_New(var, name) ->
       fprintf fout "%s <- new %s\n" var name
     | TAC_Assign_Default(var, name) ->
-      (* call_new fout name;
+      call_new fout name;
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       Hashtbl.add envtable var !stackOffset;
-      stackOffset := !stackOffset -8; *)
+      stackOffset := !stackOffset -8;
       fprintf fout "";
     | TAC_Assign_Assign(var, i) ->
       (* if Hashtbl.mem envtable var then (
@@ -875,7 +881,9 @@ let main() = (
       ) else (
         
       ); *)
-      fprintf fout "";
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 8);
+      stackOffset := !stackOffset + 8;
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
     | TAC_Branch_True(cond, label) -> 
       fprintf fout "\tcmpq $0, 24(%%r13)\n";
       fprintf fout "\tje %s\n" label;
@@ -888,6 +896,8 @@ let main() = (
       fprintf fout "%s:\n" label
     | TAC_Return(label) ->
       fprintf fout "ret\n"
+    | TAC_Remove_Let(var) ->
+      stackOffset := !stackOffset +8;
     | _ -> fprintf fout ""
   )
   in
