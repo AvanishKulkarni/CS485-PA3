@@ -50,6 +50,7 @@ and cfg_node = {
   mutable blocks: tac_instr list;
   mutable true_branch: cfg_node option;
   mutable false_branch: cfg_node option;
+  mutable parent_branches: cfg_node option list;
 }
 
 let tac_expr_to_name t = match t with TAC_Variable c -> c
@@ -368,13 +369,14 @@ let main() = (
     blocks = [];
     true_branch = None;
     false_branch = None;
+    parent_branches = [];
   } in
-  let rec merge_node curr_node = (
+  let rec merge_node curr_node join_node = (
     match curr_node with
     | Some(curr_node) -> (
       match curr_node.true_branch with
-      | None -> curr_node.true_branch <- Some(!currNode);
-      | Some(node_branch) -> merge_node (Some(node_branch));
+      | None -> curr_node.true_branch <- join_node;
+      | Some(node_branch) -> merge_node (Some(node_branch)) join_node;
     )
     | None -> ();
   )
@@ -587,10 +589,11 @@ let main() = (
           blocks = [];
           true_branch = None;
           false_branch = None;
+          parent_branches = [Some(prevNode)];
         };
+        prevNode.true_branch <- Some(!currNode);
         let tinstr, texp = convert astthen.exp_kind (var) cname mname in 
         !currNode.blocks <- !currNode.blocks @ [jjmp];
-        prevNode.true_branch <- Some(!currNode);
         (* false node *)
         currNode := {
           label = elbl;
@@ -598,19 +601,24 @@ let main() = (
           blocks = [];
           true_branch = None;
           false_branch = None;
+          parent_branches = [Some(prevNode)];
         };
+        prevNode.false_branch <- Some(!currNode);
         let einstr, eexp = convert astelse.exp_kind (var) cname mname in 
         !currNode.blocks <- !currNode.blocks @ [jjmp];
-        prevNode.false_branch <- Some(!currNode);
-        (* merge node *)
-        currNode := {
+        let joinNode : cfg_node = {
           label = jlbl;
           comment = jcomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
-        };
-        merge_node (prevNode.false_branch);
+          parent_branches = [prevNode.true_branch] @ [prevNode.false_branch];
+        }
+        in
+        (* merge node *)
+        merge_node (prevNode.true_branch) (Some(joinNode));
+        merge_node (prevNode.false_branch) (Some(joinNode));
+        currNode := joinNode;
         pinstr (* @ [notc] *) @ [be] (* @ [bt]  *)@ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
         let predvar = fresh_var() in 
@@ -888,7 +896,9 @@ let main() = (
     match cfgNode with
     | None -> ();
     | Some(cfgNode) -> 
-      if not(List.mem cfgNode.label !visitedNodes) then (
+      if (not(List.mem cfgNode.label !visitedNodes) && 
+        (List.for_all (fun x -> match x with Some(x) -> List.mem x.label !visitedNodes; | None -> true) cfgNode.parent_branches)) then (
+       (*  printf "In cfg %s\n" (match cfgNode.label with | TAC_Label(label) -> label | _ -> ""); *)
         visitedNodes :=  cfgNode.label :: !visitedNodes;
         tac_to_asm fout stackOffset cfgNode.comment;
         tac_to_asm fout stackOffset cfgNode.label;
@@ -1016,6 +1026,7 @@ in
           blocks = [];
           true_branch = None;
           false_branch = None;
+          parent_branches = [];
         }
         in
         currNode := node;
