@@ -833,7 +833,7 @@ let main() = (
     | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
     | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
-      fprintf fout "\t%s(...)\n" mname;
+      fprintf fout "\t## %s(...)\n" mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
       List.iteri (fun i _ -> fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset + 8*(i+1))) args_vars;
@@ -848,7 +848,9 @@ let main() = (
       fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars);
       fprintf fout "\tpopq %%rbp\n";
       fprintf fout "\tpopq %%r12\n";
-      fprintf fout "\tpushq %%r13\n"; (* push result of whatever we just returned onto stack *)
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
+      stackOffset := !stackOffset -8;
+      (* fprintf fout "\tpushq %%r13\n"; *) (* push result of whatever we just returned onto stack *)
     | TAC_Assign_New(var, name) ->
       fprintf fout "%s <- new %s\n" var name
     | TAC_Assign_Default(var, name) ->
