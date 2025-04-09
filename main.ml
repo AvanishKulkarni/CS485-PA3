@@ -670,8 +670,7 @@ let main() = (
       ) 0 args)
     | New((_, name)) -> 0
     | Let(bindlist, let_body) ->
-      (* assuming bindings need 0 temps since you can just modify the registers its saved at*)
-      numTemps let_body.exp_kind
+      List.length bindlist + numTemps let_body.exp_kind
     | Assign((_, name), exp) -> 0 (* same as let *)
     (* Need to finish rest of tac for objects and conditionals*)
     | If (pred, astthen, astelse) -> 
@@ -696,7 +695,17 @@ let main() = (
   let tac_to_asm fout stackOffset tac_instruction = (
     match tac_instruction with
     | TAC_Assign_Identifier(var, i) ->
-        fprintf fout "%s <- %s\n" var i
+     (*  if Hashtbl.mem envtable var then (
+        if Hashtbl.mem envtable i then (
+          fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
+          fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
+        ) else (
+          fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 8);
+          stackOffset := !stackOffset +8;
+          fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
+        );
+      ); *)
+      fprintf fout "";
     | TAC_Assign_Int(var, i) ->
       call_new fout "Int";
       fprintf fout "\tmovq $%s, 24(%%r13)\n" i;
@@ -833,9 +842,20 @@ let main() = (
     | TAC_Assign_New(var, name) ->
       fprintf fout "%s <- new %s\n" var name
     | TAC_Assign_Default(var, name) ->
-      fprintf fout "%s <- default %s\n" var name;
+      (* call_new fout name;
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
+      Hashtbl.add envtable var !stackOffset;
+      stackOffset := !stackOffset -8; *)
+      fprintf fout "";
     | TAC_Assign_Assign(var, i) ->
-      fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
+      (* if Hashtbl.mem envtable var then (
+          fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 8);
+          stackOffset := !stackOffset + 8;
+          fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
+      ) else (
+        
+      ); *)
+      fprintf fout "";
     | TAC_Branch_True(cond, label) -> 
       fprintf fout "\tcmpq $0, 24(%%r13)\n";
       fprintf fout "\tje %s\n" label;
