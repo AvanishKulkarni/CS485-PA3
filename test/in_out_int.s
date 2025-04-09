@@ -157,25 +157,35 @@ Main.main:
 	## stack room for temporaries: 1
 	subq $8, %rsp
 ## start
+	in_int(...)
 	pushq %r12
 	pushq %rbp
 	pushq %r12
+	## load Main.vtable
 	movq 16(%r12), %r14
+	## load in_int() @ vt+40
 	movq 40(%r14), %r14
+	## call in_int()
 	call *%r14
 	addq $8, %rsp
 	popq %rbp
 	popq %r12
+	pushq %r13
+	out_int(...)
 	pushq %r12
 	pushq %rbp
 	pushq 8(%rbp)
 	pushq %r12
+	## load Main.vtable
 	movq 16(%r12), %r14
+	## load out_int() @ vt+56
 	movq 56(%r14), %r14
+	## call out_int()
 	call *%r14
 	addq $16, %rsp
 	popq %rbp
 	popq %r12
+	pushq %r13
 	movq %rbp, %rsp
 	popq %rbp
 	ret
@@ -232,6 +242,7 @@ IO.in_int:
 
 	## store int into Int()
 	movq %rax, 24(%r14)
+	movq %r14, %r13
 	movq %rbp, %rsp
 	popq %rbp
 	ret

@@ -824,16 +824,22 @@ let main() = (
     | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
     | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
+      fprintf fout "\t%s(...)\n" mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
       List.iteri (fun i _ -> fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset + 8*(i+1))) args_vars;
       fprintf fout "\tpushq %%r12\n";
+      fprintf fout "\t## load %s.vtable\n" cname;
       fprintf fout "\tmovq 16(%%r12), %%r14\n";
-      fprintf fout "\tmovq %d(%%r14), %%r14\n" (Hashtbl.find vtable (cname, mname));
+      let vtableOffset = (Hashtbl.find vtable (cname, mname)) in 
+      fprintf fout "\t## load %s() @ vt+%d\n" mname vtableOffset;
+      fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
+      fprintf fout "\t## call %s()\n" mname;
       fprintf fout "\tcall *%%r14\n";
-      fprintf fout "\taddq $%d, %%rsp\n" (8+ 8*List.length args_vars);
+      fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars);
       fprintf fout "\tpopq %%rbp\n";
       fprintf fout "\tpopq %%r12\n";
+      fprintf fout "\tpushq %%r13\n"; (* push result of whatever we just returned onto stack *)
     | TAC_Assign_New(var, name) ->
       fprintf fout "%s <- new %s\n" var name
     | TAC_Assign_Default(var, name) ->
@@ -1057,6 +1063,7 @@ in
           fprintf aout "\n";
           fprintf aout "\t## store int into Int()\n";
           fprintf aout "\tmovq %%rax, 24(%%r14)\n";
+          fprintf aout "\tmovq %%r14, %%r13\n";
         )
         | "IO", "in_string" -> (
           fprintf aout "\tsubq $16, %%rsp\n";
