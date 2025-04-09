@@ -894,7 +894,8 @@ in
 
   let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 in
   
-  Hashtbl.add asm_strings "%ld" "percent.d";
+  Hashtbl.add asm_strings "%d" "percent.d";
+  Hashtbl.add asm_strings "%ld" "percent.ld";
   Hashtbl.add asm_strings "" "the.empty.string";
   Hashtbl.add asm_strings "ERROR: 0: Exception: String.substr out of range\\n" "substr.error.string";
   Hashtbl.add asm_strings "abort\\n" "abort.string";
@@ -1025,32 +1026,37 @@ in
           fprintf aout "\tsubq %%r14, %%rsp\n";
           fprintf aout "\t## return address handling\n";
           fprintf aout "\t## method body begins\n";
-          fprintf aout "\t## new Int\n";
           call_new aout "Int";
           fprintf aout "\tmovq %%r13, %%r14\n";
-          fprintf aout "\tmovl	$1, %%esi\n";
+          fprintf aout "\t## calloc input buffer\n";
+          fprintf aout "\tmovl $1, %%esi\n";
           fprintf aout "\tmovl $4096, %%edi\n";
           fprintf aout "\tcall calloc\n";
-          fprintf aout "\tpushq %%rax\n";
+          fprintf aout "\n";
+          fprintf aout "\t## read input via fgets\n";
           fprintf aout "\tmovq %%rax, %%rdi\n";
           fprintf aout "\tmovq $4096, %%rsi\n";
           fprintf aout "\tmovq stdin(%%rip), %%rdx\n";
+          fprintf aout "\n";
+          fprintf aout "\t## guarantee 16-byte alignment before call\n";
+          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
           fprintf aout "\tcall fgets\n";
-          fprintf aout "\tpopq %%rdi\n";
-          fprintf aout "\tmovl $0, %%eax\n";
-          fprintf aout "\tpushq %%rax\n";
-          fprintf aout "\tmovq %%rsp, %%rdx\n";
+          fprintf aout "\tmovq %%rax, %%r15\n";
+          fprintf aout "\n";
+          fprintf aout "\t## r15 contains the string now\n";
+          fprintf aout "\tmovq %%r15, %%rdi\n";
           fprintf aout "\tmovq $percent.d, %%rsi\n";
+          fprintf aout "\tmovq %%r13, %%rdx\n";
+          fprintf aout "\n";
+          fprintf aout "\t## guarantee 16-byte alignment before call\n";
+          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
           fprintf aout "\tcall sscanf\n";
-          fprintf aout "\tpopq %%rax\n";
-          fprintf aout "\tmovq $0, %%rsi\n";
-          fprintf aout "\tcmpq $2147483647, %%rax\n";
-          fprintf aout "\tcmovg %%rsi, %%rax\n";
-          fprintf aout "\tcmpq $-2147483648, %%rax\n";
-          fprintf aout "\tcmovl %%rsi, %%rax\n";
-          fprintf aout "\tmovq %%rax, %%r13\n";
-          fprintf aout "\tmovq %%r13, 24(%%r14)\n";
-          fprintf aout "\tmovq %%r14, %%r13\n";
+          fprintf aout "\n";
+          fprintf aout "\tmovq (%%r13), %%rax\n";
+          fprintf aout "\t## rax contains the int now\n";
+          fprintf aout "\n";
+          fprintf aout "\t## store int into Int()\n";
+          fprintf aout "\tmovq %%rax, 24(%%r14)\n";
         )
         | "IO", "in_string" -> (
           fprintf aout "\tsubq $16, %%rsp\n";
@@ -1073,7 +1079,7 @@ in
           fprintf aout "\tsubq $8, %%rsp\n";
           fprintf aout "\tmovq 24(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r13\n";
-          fprintf aout "\tmovq $percent.d, %%rdi\n";
+          fprintf aout "\tmovq $percent.ld, %%rdi\n";
           fprintf aout "\tmovl %%r13d, %%eax\n";
           fprintf aout "\tcdqe\n";
           fprintf aout "\tmovq %%rax, %%rsi\n";

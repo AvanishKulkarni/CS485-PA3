@@ -203,10 +203,6 @@ IO.in_int:
 	popq %r12
 	popq %rbp
 	movq %r13, %r14
-
-	# store Int() on stack temporarily
-	pushq %r14
-
 	## calloc input buffer
 	movl $1, %esi
 	movl $4096, %edi
@@ -222,23 +218,20 @@ IO.in_int:
 	call fgets
 	movq %rax, %r15
 
-	## r15 contains the string now 
+	## r15 contains the string now
 	movq %r15, %rdi
-	movq $percent.dd, %rsi
-	movq %r14, %rdx
+	movq $percent.d, %rsi
+	movq %r13, %rdx
 
 	## guarantee 16-byte alignment before call
 	andq $0xFFFFFFFFFFFFFFF0, %rsp
 	call sscanf
 
-	movq (%r14), %rax
-	## rax contains the int now 
+	movq (%r13), %rax
+	## rax contains the int now
 
-	## retrieve Int() from stack 
-	popq %r14
-
+	## store int into Int()
 	movq %rax, 24(%r14)
-	
 	movq %rbp, %rsp
 	popq %rbp
 	ret
@@ -273,7 +266,7 @@ IO.out_int:
 	subq $8, %rsp
 	movq 24(%rbp), %r14
 	movq 24(%r14), %r13
-	movq $percent.d, %rdi
+	movq $percent.ld, %rdi
 	movl %r13d, %eax
 	cdqe
 	movq %rax, %rsi
@@ -792,6 +785,12 @@ string3:	## "Main"
 .byte 110 # n
 .byte 0
 
+.globl percent.d
+percent.d:	## "%d"
+.byte  37 # %
+.byte 100 # d
+.byte 0
+
 .globl string1
 string1:	## "IO"
 .byte  73 # I
@@ -825,16 +824,10 @@ string4:	## "Object"
 .byte 116 # t
 .byte 0
 
-.globl percent.d
-percent.d:	## "%ld"
+.globl percent.ld
+percent.ld:	## "%ld"
 .byte  37 # %
 .byte 108 # l
-.byte 100 # d
-.byte 0
-
-.globl percent.dd
-percent.dd:	## "%d"
-.byte  37 # %
 .byte 100 # d
 .byte 0
 
