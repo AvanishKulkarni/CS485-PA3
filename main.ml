@@ -862,7 +862,7 @@ let main() = (
     | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
     | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
-      if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      (* if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 8; funRetFlag := "";); *)
       funRetFlag := "";
       fprintf fout "\n\t## %s(...)\n" mname;
       fprintf fout "\tpushq %%r12\n";
