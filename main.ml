@@ -117,6 +117,7 @@ let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
 let envtable : (string, int) Hashtbl.t = Hashtbl.create 255
 
 let main() = (
+  Printexc.record_backtrace true;
   let fname = Sys.argv.(1) in 
   let fin = open_in fname in 
   let rec range k = if k <= 0 then [] else k :: range (k - 1) in
@@ -706,16 +707,7 @@ let main() = (
   let tac_to_asm fout stackOffset tac_instruction = (
     match tac_instruction with
     | TAC_Assign_Identifier(var, i) ->
-     (*  if Hashtbl.mem envtable var then (
-        if Hashtbl.mem envtable i then (
-          fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
-          fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
-        ) else (
-          fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 8);
-          stackOffset := !stackOffset +8;
-          fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
-        );
-      ); *)
+      (* printf "Searching for var %s\n" var; *)
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -8;
@@ -870,21 +862,18 @@ let main() = (
     | TAC_Assign_Default(var, name) ->
       call_new fout name;
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
+      (* printf "Adding var %s\n" var; *)
       Hashtbl.add envtable var !stackOffset;
       stackOffset := !stackOffset -8;
       fprintf fout "";
     | TAC_Assign_Assign(var, i) ->
-      (* if Hashtbl.mem envtable var then (
-          fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 8);
-          stackOffset := !stackOffset + 8;
-          fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
-      ) else (
-        
-      ); *)
+      (* printf "Searching for var %s\n" var; *)
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 8);
       stackOffset := !stackOffset + 8;
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
     | TAC_Branch_True(cond, label) -> 
+      stackOffset := !stackOffset + 8;
+      fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
       fprintf fout "\tcmpq $0, 24(%%r13)\n";
       fprintf fout "\tje %s\n" label;
     | TAC_Comment(comment) ->
