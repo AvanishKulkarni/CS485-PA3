@@ -1,5 +1,23 @@
 class Main inherits IO {
   main() : Object {
-    out_int(in_int())
+    let x : Int in {
+      x <- in_int();
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+      out_int(x); 
+    }
   };
 };
