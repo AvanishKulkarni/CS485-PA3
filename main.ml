@@ -739,7 +739,7 @@ let main() = (
     | TAC_Assign_String(var, i) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
       funRetFlag := "";
-      fprintf fout "%s <- string\n%s\n" var i
+      fprintf fout "## TAC_Assign_String: %s <- string\n%s\n" var i
     | TAC_Assign_Plus(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
       funRetFlag := "";
@@ -852,13 +852,13 @@ let main() = (
     | TAC_Assign_NullCheck(var, i) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
+      fprintf fout "## TAC_Assign_NullCheck: %s <- isvoid %s\n" var (tac_expr_to_name i)
       (* TODO later *)
       (* if class tag is Int, String, Bool -> return Bool(false) *)
       (* if class tag is something else, check if not initialized *)
       (* return Bool(true) if not initialized, Bool(false) otherwise *)
     | TAC_Assign_FunctionCall(var, mname, None) ->
-      fprintf fout "%s <- call %s\n" var mname;
+      fprintf fout "\t## TAC_Assign_FunctionCall: %s <- call %s\n" var mname;
     | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
     | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
@@ -889,7 +889,7 @@ let main() = (
     | TAC_Assign_New(var, name) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "%s <- new %s\n" var name
+      fprintf fout "## TAC_Assign_New: %s <- new %s\n" var name
     | TAC_Assign_Default(var, name) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
       funRetFlag := "";
