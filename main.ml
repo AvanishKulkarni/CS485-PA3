@@ -1078,7 +1078,7 @@ in
         (* let nformals = List.length(formals) in  *)
         let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
         fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
-        fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 8);
+        fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
         let node : cfg_node = {
           label = TAC_Internal("");
           comment = TAC_Comment("start");
