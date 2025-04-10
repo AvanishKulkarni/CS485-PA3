@@ -4,7 +4,7 @@ import random
 INT_MIN = -50
 # INT_MAX = 2_147_483_647
 INT_MAX = 50
-OPERATORS = ['+', '-', '*', '/']
+OPERATORS = ['<', '<=', '=']
 
 def random_number():
   num = random.randint(INT_MIN, INT_MAX)
@@ -31,8 +31,9 @@ random_expression = generate_expression()
 with open(r"test/arithmetic_random.cl", "w") as file:
   file.write("class Main inherits IO {\n")
   file.write("  main() : Object {\n")
-  file.write("    out_int(")
+  file.write("    if (")
   file.write(random_expression)
   file.write(")\n")
+  file.write("then out_int(1) else out_int(0) fi")
   file.write("  };\n")
   file.write("};\n")
