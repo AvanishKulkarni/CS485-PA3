@@ -788,10 +788,8 @@ let main() = (
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
-      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
-      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall lt_handler\n";
       fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
@@ -803,10 +801,8 @@ let main() = (
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
-      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
-      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall le_handler\n";
       fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
@@ -818,10 +814,8 @@ let main() = (
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
-      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
-      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall eq_handler\n";
       fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
@@ -1612,7 +1606,7 @@ in
     fprintf aout "\n## LT_HANDLER\n";
     fprintf aout ".globl lt_handler\nlt_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
-    fprintf aout "\tcmpq %%rsi, %%rdi\n";
+    fprintf aout "\tcmpl %%edi, %%esi\n";
     fprintf aout "\tjl lt_true\n";
     fprintf aout "\tmovq $0, %%rax\n";
     fprintf aout "\tjmp lt_handler_end\n";
@@ -1626,7 +1620,7 @@ in
     fprintf aout "\n## LE_HANDLER\n";
     fprintf aout ".globl le_handler\nle_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
-    fprintf aout "\tcmpq %%rsi, %%rdi\n";
+    fprintf aout "\tcmpl %%edi, %%esi\n";
     fprintf aout "\tjle le_true\n";
     fprintf aout "\tmovq $0, %%rax\n";
     fprintf aout "\tjmp le_handler_end\n";
@@ -1642,7 +1636,7 @@ in
     fprintf aout "\n## EQ_HANDLER\n";
     fprintf aout ".globl eq_handler\neq_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
-    fprintf aout "\tcmpq %%rsi, %%rdi\n";
+    fprintf aout "\tcmpl %%edi, %%esi\n";
     fprintf aout "\tje eq_true\n";
     fprintf aout "\tmovq $0, %%rax\n";
     fprintf aout "\tjmp eq_handler_end\n";
