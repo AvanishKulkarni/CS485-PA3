@@ -1077,7 +1077,7 @@ in
           fprintf aout "\n";
           fprintf aout "\t## r15 contains the string now\n";
           fprintf aout "\tmovq %%r15, %%rdi\n";
-          fprintf aout "\tmovq $percent.d, %%rsi\n";
+          fprintf aout "\tmovq $percent.ld, %%rsi\n";
           fprintf aout "\tmovq %%r13, %%rdx\n";
           fprintf aout "\n";
           fprintf aout "\t## guarantee 16-byte alignment before call\n";
@@ -1086,6 +1086,12 @@ in
           fprintf aout "\n";
           fprintf aout "\tmovq (%%r13), %%rax\n";
           fprintf aout "\t## rax contains the int now\n";
+          fprintf aout "\t## now checking overflow\n";
+          fprintf aout "\tmovq $0, %%rsi\n";
+          fprintf aout "\tcmpq $2147483647, %%rax\n";
+          fprintf aout "\tcmovg %%rsi, %%rax\n";
+          fprintf aout "\tcmpq $-2147483648, %%rax\n";
+          fprintf aout "\tcmovl %%rsi, %%rax\n";
           fprintf aout "\n";
           fprintf aout "\t## store int into Int()\n";
           fprintf aout "\tmovq %%rax, 24(%%r14)\n";
