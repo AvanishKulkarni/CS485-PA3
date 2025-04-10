@@ -745,6 +745,7 @@ let main() = (
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
       stackOffset := !stackOffset +16;
+      fprintf fout "\n\t# Arithmetic Add\n";
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);

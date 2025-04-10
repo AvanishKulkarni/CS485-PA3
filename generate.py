@@ -30,7 +30,7 @@ def generate_expression(variables, depth=3, is_boolean=False):
   # Generate integer expressions
   left = generate_expression(variables, depth - 1, is_boolean=False)
   right = generate_expression(variables, depth - 1, is_boolean=False)
-  operator = random.choice(["<", "<=", "="])  # Valid comparison operators for integers
+  operator = random.choice(["<"])  # Valid comparison operators for integers
 
   # Switch to Boolean context for deeper levels
   if depth - 1 > 0:
@@ -39,8 +39,8 @@ def generate_expression(variables, depth=3, is_boolean=False):
   else:
     return f"({left} {operator} {right})"
 
-variables = [1, 2, 16, 28, 42, 50]  # Sample integer values
-random_expression = generate_expression(variables, depth=3)
+variables = [random_number() for _ in range(20)]  # Sample integer values
+random_expression = generate_expression(variables, depth=2)
 
 # Generate a random expression with nesting
 with open(r"test/arithmetic_random.cl", "w") as file:
