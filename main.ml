@@ -558,6 +558,7 @@ let main() = (
               Hashtbl.remove ident_tac vname;
               )
             bindlist;
+        !currNode.blocks <- !currNode.blocks @ !removeScope;
         (!retTacInstr @ i @ !removeScope), TAC_Variable(var)
       | Assign((_, name), exp) ->
         let tac_var = Hashtbl.find ident_tac name in
@@ -570,13 +571,13 @@ let main() = (
       | If (pred, astthen, astelse) -> 
         let thenvar = fresh_var () in 
         let thenlbl = fresh_label cname mname in 
-        let elsevar = fresh_var () in 
+        (* let elsevar = fresh_var () in  *)
         let elselbl = fresh_label cname mname in 
         let joinlbl = fresh_label cname mname in 
         let pinstr, pexp = convert pred.exp_kind (thenvar) cname mname in 
         (* let notc = TAC_Assign_BoolNegate(elsevar, pexp) in *)
         (* let bt = TAC_Branch_True(thenvar, thenlbl) in *)
-        let be = TAC_Branch_True(elsevar, elselbl) in 
+        let be = TAC_Branch_True((tac_expr_to_name pexp), elselbl) in 
         let tcomm = TAC_Comment("then branch") in 
         let tlbl = TAC_Label(thenlbl) in
         let ecomm = TAC_Comment("else branch") in 
@@ -716,16 +717,16 @@ let main() = (
       stackOffset := !stackOffset -8;
       fprintf fout "";
     | TAC_Assign_Int(var, i) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
-      funRetFlag := "";
+      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
+      funRetFlag := ""; *)
       call_new fout "Int";
       fprintf fout "\tmovq $%s, 24(%%r13)\n" i;
       (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -8;
     | TAC_Assign_Bool(var, i) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
-      funRetFlag := "";
+      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
+      funRetFlag := ""; *)
       call_new fout "Bool";
       let bool_int = match i with 
       | "true" -> 1
@@ -737,8 +738,8 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -8;
     | TAC_Assign_String(var, i) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
-      funRetFlag := "";
+      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
+      funRetFlag := ""; *)
       fprintf fout "%s <- string\n%s\n" var i
     | TAC_Assign_Plus(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
@@ -838,20 +839,20 @@ let main() = (
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_ArithNegate(var, i) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      funRetFlag := ""; *)
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
       fprintf fout "\tnegq 24(%%r14)\n";
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_BoolNegate(var, i) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      funRetFlag := ""; *)
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
       fprintf fout "\txorq $1, 24(%%r14)\n";
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_NullCheck(var, i) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      funRetFlag := ""; *) (* check if this is a tempporary, if so then delete*)
       fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
       (* TODO later *)
       (* if class tag is Int, String, Bool -> return Bool(false) *)
@@ -914,31 +915,31 @@ let main() = (
     | TAC_Branch_True(cond, label) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";); 
       funRetFlag := "";
-      stackOffset := !stackOffset + 8;
-      fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
+      if not(Hashtbl.mem envtable cond) then (
+        stackOffset := !stackOffset + 8;
+        fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
+      ) else (
+        fprintf fout "\tmovq %d(%%rbp), %%r13\n" (Hashtbl.find envtable cond);
+      );
       fprintf fout "\tcmpq $0, 24(%%r13)\n";
       fprintf fout "\tje %s\n" label;
     | TAC_Comment(comment) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
       fprintf fout "## %s\n" comment;
     | TAC_Jump(label) -> 
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
       fprintf fout "\tjmp %s\n" label;
     | TAC_Label(label) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
       fprintf fout ".globl %s\n" label;
       fprintf fout "%s:\n" label
     | TAC_Return(label) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
       fprintf fout "ret\n"
     | TAC_Remove_Let(var) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      fprintf fout "\t## Propagating Let return down\n";
+      if (!stackOffset <= -16) then (
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset +8);
       funRetFlag := "";
       stackOffset := !stackOffset +8;
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
+      );
     | _ -> fprintf fout ""
   )
   in
@@ -949,16 +950,23 @@ let main() = (
     | Some(cfgNode) -> 
       if (not(List.mem cfgNode.label !visitedNodes) && 
         (List.for_all (fun x -> match x with Some(x) -> List.mem x.label !visitedNodes; | None -> true) cfgNode.parent_branches)) then (
-       (*  printf "In cfg %s\n" (match cfgNode.label with | TAC_Label(label) -> label | _ -> ""); *)
+        (* printf "In cfg %s\n" (match cfgNode.label with | TAC_Label(label) -> label | _ -> "");
+        printf "StackOffset Before Blocks: %d\n" !stackOffset; *)
         visitedNodes :=  cfgNode.label :: !visitedNodes;
         tac_to_asm fout stackOffset cfgNode.comment;
         tac_to_asm fout stackOffset cfgNode.label;
         List.iter ( fun x ->
           tac_to_asm fout stackOffset x;
         ) cfgNode.blocks;
+        (* printf "StackOffset After Blocks: %d\n" !stackOffset; *)
         let trueOffset, falseOffset = ref !stackOffset, ref !stackOffset in
+        funRetFlag := "";
         output_asm fout trueOffset cfgNode.true_branch;
+        (* stackOffset := !trueOffset; *)
+        funRetFlag := "";
         output_asm fout falseOffset cfgNode.false_branch;
+        
+        
       )
   )
 in
