@@ -934,7 +934,7 @@ let main() = (
       fprintf fout "ret\n"
     | TAC_Remove_Let(var) ->
       fprintf fout "\t## Propagating Let return down\n";
-      if (!stackOffset <= -16) then (
+      if (!stackOffset <= -32) then (
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset +16);
       funRetFlag := "";
       stackOffset := !stackOffset +16;
@@ -975,6 +975,7 @@ in
   let print_calloc fout nmemb msize = (
     fprintf fout "\tmovq $%d, %%rdi\n" nmemb;
     fprintf fout "\tmovq $%d, %%rsi\n" msize;
+    fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
     fprintf fout "\tcall calloc\n";
     fprintf fout "\tmovq %%rax, %%r12\n";
   ) in
