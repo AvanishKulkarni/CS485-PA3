@@ -1,9 +1,9 @@
 import random
 
 # INT_MIN = -2_147_483_648
-INT_MIN = -50
+INT_MIN = -64
 # INT_MAX = 2_147_483_647
-INT_MAX = 50
+INT_MAX = 64
 OPERATORS = ['<', '<=', '=', 'not']
 
 def random_number():
@@ -39,8 +39,8 @@ def generate_expression(variables, depth=3, is_boolean=False):
   else:
     return f"({left} {operator} {right})"
 
-variables = [random_number() for _ in range(20)]  # Sample integer values
-random_expression = generate_expression(variables, depth=2)
+variables = [chr(c) for c in range(ord('a'), ord('z')+1)]  # Sample integer values
+random_expression = generate_expression(variables, depth=5)
 
 # Generate a random expression with nesting
 with open(r"test/arithmetic_random.cl", "w") as file:
