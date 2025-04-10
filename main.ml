@@ -710,14 +710,14 @@ let main() = (
     | TAC_Assign_Identifier(var, i) ->
       (* printf "Searching for var %s\n" var; *)
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 8);
-      funRetFlag := "";
+      funRetFlag := var;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -8;
       fprintf fout "";
     | TAC_Assign_Int(var, i) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
-      funRetFlag := "";
+      funRetFlag := var;
       call_new fout "Int";
       fprintf fout "\tmovq $%s, 24(%%r13)\n" i;
       (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
@@ -725,7 +725,7 @@ let main() = (
       stackOffset := !stackOffset -8;
     | TAC_Assign_Bool(var, i) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
-      funRetFlag := "";
+      funRetFlag := var;
       call_new fout "Bool";
       let bool_int = match i with 
       | "true" -> 1
@@ -738,11 +738,11 @@ let main() = (
       stackOffset := !stackOffset -8;
     | TAC_Assign_String(var, i) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
-      funRetFlag := "";
+      funRetFlag := var;
       fprintf fout "%s <- string\n%s\n" var i
     | TAC_Assign_Plus(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
@@ -754,7 +754,7 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_Minus(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
@@ -766,7 +766,7 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_Times(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
@@ -778,7 +778,7 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_Div(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
@@ -794,7 +794,7 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_Lt(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
@@ -809,7 +809,7 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_Le(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
@@ -824,7 +824,7 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_Eq(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
@@ -839,19 +839,19 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_ArithNegate(var, i) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
       fprintf fout "\tnegq 24(%%r14)\n";
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_BoolNegate(var, i) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
       fprintf fout "\txorq $1, 24(%%r14)\n";
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
     | TAC_Assign_NullCheck(var, i) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
       (* TODO later *)
       (* if class tag is Int, String, Bool -> return Bool(false) *)
@@ -863,11 +863,14 @@ let main() = (
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
     | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
       if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
-      funRetFlag := "";
+      funRetFlag := var;
       fprintf fout "\n\t## %s(...)\n" mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
-      List.iteri (fun i _ -> fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset + 8*(i+1))) args_vars;
+      List.iteri (fun i _ -> 
+        stackOffset := !stackOffset + 8;
+        fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);) args_vars;
+
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\t## load %s.vtable\n" cname;
       fprintf fout "\tmovq 16(%%r12), %%r14\n";
@@ -895,7 +898,6 @@ let main() = (
       (* printf "Adding var %s\n" var; *)
       Hashtbl.add envtable var !stackOffset;
       stackOffset := !stackOffset -8;
-      fprintf fout "";
     | TAC_Assign_Assign(var, i) ->
       (* printf "Searching for var %s\n" var; *)
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
