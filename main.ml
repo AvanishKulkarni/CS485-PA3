@@ -694,7 +694,7 @@ let main() = (
   )
   in
   let call_new fout cname = (
-    fprintf fout "\t## new %s\n" cname;
+    fprintf fout "\n\t## new %s\n" cname;
     fprintf fout "\tpushq %%rbp\n";
     fprintf fout "\tpushq %%r12\n";
     fprintf fout "\tmovq $%s..new, %%r14\n" cname;
@@ -778,13 +778,13 @@ let main() = (
     | TAC_Assign_Lt(var, i1, i2) ->
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-      fprintf fout "\tmovq 24(%%r15), %%r15\n";
-      fprintf fout "\tpushq %%r14\n";
-      fprintf fout "\tpushq %%r15\n";
+      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall lt_handler\n";
-      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
@@ -793,13 +793,13 @@ let main() = (
     | TAC_Assign_Le(var, i1, i2) ->
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-      fprintf fout "\tmovq 24(%%r15), %%r15\n";
-      fprintf fout "\tpushq %%r14\n";
-      fprintf fout "\tpushq %%r15\n";
+      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall le_handler\n";
-      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
@@ -808,13 +808,13 @@ let main() = (
     | TAC_Assign_Eq(var, i1, i2) ->
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-      fprintf fout "\tmovq 24(%%r14), %%r14\n";
+      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-      fprintf fout "\tmovq 24(%%r15), %%r15\n";
-      fprintf fout "\tpushq %%r14\n";
-      fprintf fout "\tpushq %%r15\n";
+      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall eq_handler\n";
-      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
@@ -839,7 +839,7 @@ let main() = (
     | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
     | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
-      fprintf fout "\t## %s(...)\n" mname;
+      fprintf fout "\n\t## %s(...)\n" mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
       List.iteri (fun i _ -> fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset + 8*(i+1))) args_vars;
@@ -1600,9 +1600,7 @@ in
     fprintf aout "\n## LT_HANDLER\n";
     fprintf aout ".globl lt_handler\nlt_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
-    fprintf aout "\tmovq 24(%%rbp), %%r14\n"; (* second argument *)
-    fprintf aout "\tmovq 16(%%rbp), %%r15\n"; (* first argument *)
-    fprintf aout "\tcmpq %%r14, %%r15\n";
+    fprintf aout "\tcmpq %%rsi, %%rdi\n";
     fprintf aout "\tjl lt_true\n";
     fprintf aout "\tmovq $0, %%rax\n";
     fprintf aout "\tjmp lt_handler_end\n";
@@ -1616,9 +1614,7 @@ in
     fprintf aout "\n## LE_HANDLER\n";
     fprintf aout ".globl le_handler\nle_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
-    fprintf aout "\tmovq 24(%%rbp), %%r14\n"; (* second argument *)
-    fprintf aout "\tmovq 16(%%rbp), %%r15\n"; (* first argument *)
-    fprintf aout "\tcmpq %%r14, %%r15\n";
+    fprintf aout "\tcmpq %%rsi, %%rdi\n";
     fprintf aout "\tjle le_true\n";
     fprintf aout "\tmovq $0, %%rax\n";
     fprintf aout "\tjmp le_handler_end\n";
@@ -1626,15 +1622,15 @@ in
     fprintf aout "\tmovq $1, %%rax\n";
     fprintf aout "\tjmp le_handler_end\n";
     fprintf aout ".globl le_handler_end\nle_handler_end:\n";
+    (* call_new aout "Bool";
+    fprintf aout "\tmovq %%rax, 24(%%r13)\n"; *)
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
 
     (* print out equal handler *)
     fprintf aout "\n## EQ_HANDLER\n";
     fprintf aout ".globl eq_handler\neq_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
-    fprintf aout "\tmovq 24(%%rbp), %%r14\n"; (* second argument *)
-    fprintf aout "\tmovq 16(%%rbp), %%r15\n"; (* first argument *)
-    fprintf aout "\tcmpq %%r14, %%r15\n";
+    fprintf aout "\tcmpq %%rsi, %%rdi\n";
     fprintf aout "\tje eq_true\n";
     fprintf aout "\tmovq $0, %%rax\n";
     fprintf aout "\tjmp eq_handler_end\n";
