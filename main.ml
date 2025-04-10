@@ -710,22 +710,22 @@ let main() = (
     match tac_instruction with
     | TAC_Assign_Identifier(var, i) ->
       (* printf "Searching for var %s\n" var; *)
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8);
+      if !funRetFlag <> "" then (stackOffset := !stackOffset + 16);
       funRetFlag := "";
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
-      stackOffset := !stackOffset -8;
+      stackOffset := !stackOffset -16;
       fprintf fout "";
     | TAC_Assign_Int(var, i) ->
-      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
+      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
       funRetFlag := ""; *)
       call_new fout "Int";
       fprintf fout "\tmovq $%s, 24(%%r13)\n" i;
       (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
-      stackOffset := !stackOffset -8;
+      stackOffset := !stackOffset -16;
     | TAC_Assign_Bool(var, i) ->
-      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
+      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
       funRetFlag := ""; *)
       call_new fout "Bool";
       let bool_int = match i with 
@@ -736,54 +736,54 @@ let main() = (
       fprintf fout "\tmovq $%d, 24(%%r13)\n" bool_int;
       (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
-      stackOffset := !stackOffset -8;
+      stackOffset := !stackOffset -16;
     | TAC_Assign_String(var, i) ->
-      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 8;);
+      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
       funRetFlag := ""; *)
       fprintf fout "%s <- string\n%s\n" var i
     | TAC_Assign_Plus(var, i1, i2) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      stackOffset := !stackOffset +8;
+      stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovq 24(%%r15), %%r15\n";
       fprintf fout "\taddq %%r14, %%r15\n";
       call_new fout "Int";
       fprintf fout "\tmovq %%r15, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_Minus(var, i1, i2) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      stackOffset := !stackOffset +8;
+      stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovq 24(%%r15), %%r15\n";
       fprintf fout "\tsubq %%r14, %%r15\n";
       call_new fout "Int";
       fprintf fout "\tmovq %%r15, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_Times(var, i1, i2) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      stackOffset := !stackOffset +8;
+      stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovq 24(%%r15), %%r15\n";
       fprintf fout "\timulq %%r14, %%r15\n";
       call_new fout "Int";
       fprintf fout "\tmovq %%r15, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_Div(var, i1, i2) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      stackOffset := !stackOffset +8;
+      stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovq 24(%%r15), %%rax\n";
       fprintf fout "\tmovq $0, %%rdx\n";
       fprintf fout "\tcqto\n";
@@ -792,66 +792,66 @@ let main() = (
       call_new fout "Int";
       fprintf fout "\tpopq %%rax\n";
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_Lt(var, i1, i2) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      stackOffset := !stackOffset +8;
+      stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tcall lt_handler\n";
-      fprintf fout "\taddq $8, %%rsp\n";
+      fprintf fout "\taddq $16, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_Le(var, i1, i2) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      stackOffset := !stackOffset +8;
+      stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tcall le_handler\n";
-      fprintf fout "\taddq $8, %%rsp\n";
+      fprintf fout "\taddq $16, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_Eq(var, i1, i2) ->
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      stackOffset := !stackOffset +8;
+      stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tcall eq_handler\n";
-      fprintf fout "\taddq $8, %%rsp\n";
+      fprintf fout "\taddq $16, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_ArithNegate(var, i) ->
-      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := ""; *)
-      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+16);
       fprintf fout "\tnegq 24(%%r14)\n";
-      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_BoolNegate(var, i) ->
-      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := ""; *)
-      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+8);
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+16);
       fprintf fout "\txorq $1, 24(%%r14)\n";
-      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_NullCheck(var, i) ->
-      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := ""; *) (* check if this is a tempporary, if so then delete*)
       fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
       (* TODO later *)
@@ -863,7 +863,7 @@ let main() = (
     | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
     | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
-      (* if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 8; funRetFlag := "";); *)
+      (* if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 16; funRetFlag := "";); *)
       funRetFlag := "";
       fprintf fout "\n\t## %s(...)\n" mname;
       fprintf fout "\tpushq %%r12\n";
@@ -871,7 +871,7 @@ let main() = (
       List.iteri (fun i var -> 
         let var = (tac_expr_to_name var) in
         if not(Hashtbl.mem envtable var) then (
-          stackOffset := !stackOffset + 8;
+          stackOffset := !stackOffset + 16;
         fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);
         ) else (
           fprintf fout "\tpushq %d(%%rbp)\n" (Hashtbl.find envtable var);
@@ -886,37 +886,37 @@ let main() = (
       fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
       fprintf fout "\t## call %s()\n" mname;
       fprintf fout "\tcall *%%r14\n";
-      fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars);
+      fprintf fout "\taddq $%d, %%rsp\n" (16 + 16 * List.length args_vars);
       fprintf fout "\tpopq %%rbp\n";
       fprintf fout "\tpopq %%r12\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
-      stackOffset := !stackOffset -8;
+      stackOffset := !stackOffset -16;
       funRetFlag := var;
       (* fprintf fout "\tpushq %%r13\n"; *) (* push result of whatever we just returned onto stack *)
     | TAC_Assign_New(var, name) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
       fprintf fout "%s <- new %s\n" var name
     | TAC_Assign_Default(var, name) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
       call_new fout name;
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       (* printf "Adding var %s\n" var; *)
       Hashtbl.add envtable var !stackOffset;
-      stackOffset := !stackOffset -8;
+      stackOffset := !stackOffset -16;
     | TAC_Assign_Assign(var, i) ->
       (* printf "Searching for var %s\n" var; *)
-      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 8; funRetFlag := "";);
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 8);
-      stackOffset := !stackOffset + 8;
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 16);
+      stackOffset := !stackOffset + 16;
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
     | TAC_Branch_True(cond, label) ->
-      if !funRetFlag <> "" then (stackOffset := !stackOffset + 8; funRetFlag := "";); 
+      if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";); 
       funRetFlag := "";
       if not(Hashtbl.mem envtable cond) then (
-        stackOffset := !stackOffset + 8;
+        stackOffset := !stackOffset + 16;
         fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
       ) else (
         fprintf fout "\tmovq %d(%%rbp), %%r13\n" (Hashtbl.find envtable cond);
@@ -935,10 +935,10 @@ let main() = (
     | TAC_Remove_Let(var) ->
       fprintf fout "\t## Propagating Let return down\n";
       if (!stackOffset <= -16) then (
-      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset +8);
+      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset +16);
       funRetFlag := "";
-      stackOffset := !stackOffset +8;
-      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+8);
+      stackOffset := !stackOffset +16;
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+16);
       );
     | _ -> fprintf fout ""
   )
@@ -1007,7 +1007,7 @@ in
       Hashtbl.add asm_strings cname ("string"^(string_of_int i));
       fprintf aout "\t.quad %s..new\n" cname; (* constructor *)
       List.iteri (fun i (mname, _, defclass, _) -> (
-        Hashtbl.add vtable (cname, mname) ((i+2) * 8);
+        Hashtbl.add vtable (cname, mname) ((i+2) * 16);
         fprintf aout "\t.quad %s.%s\n" defclass mname;
       )) methods
     )) impl_map;
@@ -1072,13 +1072,13 @@ in
         fprintf aout ".globl %s.%s\n" cname mname;
         fprintf aout "%s.%s:\n" cname mname;
         fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
-        fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+        fprintf aout "\tmovq 32(%%rbp), %%r12\n";
 
         (* allocate formals onto stack *)
         (* let nformals = List.length(formals) in  *)
         let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
         fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
-        fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 8);
+        fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
         let node : cfg_node = {
           label = TAC_Internal("");
           comment = TAC_Comment("start");
@@ -1118,7 +1118,7 @@ in
         (* copied from reference compiler *)
         (match cname, mname with 
         | "IO", "in_int" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
           fprintf aout "\t## stack room for temporaries: 2\n";
           fprintf aout "\tmovq $16, %%r14\n";
           fprintf aout "\tsubq %%r14, %%rsp\n";
@@ -1210,9 +1210,9 @@ in
           fprintf aout "\tmovq %%r14, %%r13\n";
         )
         | "IO", "out_int" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
-          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
+          fprintf aout "\tmovq 48(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r13\n";
           fprintf aout "\tmovq $percent.ld, %%rdi\n";
           fprintf aout "\tmovl %%r13d, %%eax\n";
@@ -1224,10 +1224,10 @@ in
           fprintf aout "\tmov %%r12, %%r13\n";
         )
         | "IO", "out_string" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
           fprintf aout "\tmovq $16, %%r14\n";
           fprintf aout "\tsubq %%r14, %%rsp\n";
-          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 48(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r13\n";
           fprintf aout "\t## guarantee 16-byte alignment before call\n";
           fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
@@ -1237,15 +1237,15 @@ in
           fprintf aout "\tret\n";
         )
         | "Object", "abort" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tmovq $abort.string, %%rdi\n";
           fprintf aout "\tcall cooloutstr\n";
           fprintf aout "\tmovl $0, %%edi\n";
           fprintf aout "\tcall exit\n";
         )
         | "Object", "copy" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
           fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tmovq 8(%%r12), %%r14\n";
           fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
@@ -1270,8 +1270,8 @@ in
           fprintf aout "\tpopq %%r13\n";
         )
         | "Object", "type_name" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tpushq %%rbp\n";
           fprintf aout "\tpushq %%r12\n";
           fprintf aout "\tmovq $String..new, %%r14\n";
@@ -1283,8 +1283,8 @@ in
           fprintf aout "\tmovq %%r14, 24(%%r13)\n";
         )
         | "String", "length" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tpushq %%rbp\n";
           fprintf aout "\tpushq %%r12\n";
           fprintf aout "\tmovq $Int..new, %%r14\n";
@@ -1301,8 +1301,8 @@ in
           fprintf aout "\tmovq %%r14, %%r13\n";
         )
         | "String", "concat" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tpushq %%rbp\n";
           fprintf aout "\tpushq %%r12\n";
           fprintf aout "\tmovq $String..new, %%r14\n";
@@ -1310,7 +1310,7 @@ in
           fprintf aout "\tpopq %%r12\n";
           fprintf aout "\tpopq %%rbp\n";
           fprintf aout "\tmovq %%r13, %%r15\n";
-          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 48(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r14\n";
           fprintf aout "\tmovq 24(%%r12), %%r13\n";
           fprintf aout "\tmovq %%r13, %%rdi\n";
@@ -1321,8 +1321,8 @@ in
           fprintf aout "\tmovq %%r15, %%r13\n";
         )
         | "String", "substr" -> (
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r12\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tpushq %%rbp\n";
           fprintf aout "\tpushq %%r12\n";
           fprintf aout "\tmovq $String..new, %%r14\n";
@@ -1330,9 +1330,9 @@ in
           fprintf aout "\tpopq %%r12\n";
           fprintf aout "\tpopq %%rbp\n";
           fprintf aout "\tmovq %%r13, %%r15\n";
-          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 48(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r14\n";
-          fprintf aout "\tmovq 32(%%rbp), %%r13\n";
+          fprintf aout "\tmovq 64(%%rbp), %%r13\n";
           fprintf aout "\tmovq 24(%%r13), %%r13\n";
           fprintf aout "\tmovq 24(%%r12), %%r12\n";
           fprintf aout "\tmovq %%r12, %%rdi\n";
@@ -1372,13 +1372,13 @@ in
     fprintf aout "\tmovq	%%rsp, %%rbp\n";
     fprintf aout "\t.cfi_def_cfa_register 6\n";
     fprintf aout "\tsubq	$32, %%rsp\n";
-    fprintf aout "\tmovq	%%rdi, -24(%%rbp)\n";
+    fprintf aout "\tmovq	%%rdi, -48(%%rbp)\n";
     fprintf aout "\tmovl	$0, -4(%%rbp)\n";
     fprintf aout "\tjmp	.L2\n";
     fprintf aout ".L5:\n";
     fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
     fprintf aout "\tmovslq	%%eax, %%rdx\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout "\taddq	%%rdx, %%rax\n";
     fprintf aout "\tmovzbl	(%%rax), %%eax\n";
     fprintf aout "\tcmpb	$92, %%al\n";
@@ -1386,7 +1386,7 @@ in
     fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
     fprintf aout "\tcltq\n";
     fprintf aout "\tleaq	1(%%rax), %%rdx\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout "\taddq	%%rdx, %%rax\n";
     fprintf aout "\tmovzbl	(%%rax), %%eax\n";
     fprintf aout "\tcmpb	$110, %%al\n";
@@ -1400,7 +1400,7 @@ in
     fprintf aout ".L3:\n";
     fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
     fprintf aout "\tmovslq	%%eax, %%rdx\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout "\taddq	%%rdx, %%rax\n";
     fprintf aout "\tmovzbl	(%%rax), %%eax\n";
     fprintf aout "\tcmpb	$92, %%al\n";
@@ -1408,7 +1408,7 @@ in
     fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
     fprintf aout "\tcltq\n";
     fprintf aout "\tleaq	1(%%rax), %%rdx\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout "\taddq	%%rdx, %%rax\n";
     fprintf aout "\tmovzbl	(%%rax), %%eax\n";
     fprintf aout "\tcmpb	$116, %%al\n";
@@ -1423,7 +1423,7 @@ in
     fprintf aout "\tmovq	stdout(%%rip), %%rdx\n";
     fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
     fprintf aout "\tmovslq	%%eax, %%rcx\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout "\taddq	%%rcx, %%rax\n";
     fprintf aout "\tmovzbl	(%%rax), %%eax\n";
     fprintf aout "\tmovsbl	%%al, %%eax\n";
@@ -1434,7 +1434,7 @@ in
     fprintf aout ".L2:\n";
     fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
     fprintf aout "\tmovslq	%%eax, %%rdx\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout "\taddq	%%rdx, %%rax\n";
     fprintf aout "\tmovzbl	(%%rax), %%eax\n";
     fprintf aout "\ttestb	%%al, %%al\n";
@@ -1463,7 +1463,7 @@ in
     fprintf aout "\t.cfi_offset 6, -16\n";
     fprintf aout "\tmovq %%rsp, %%rbp\n";
     fprintf aout "\t.cfi_def_cfa_register 6\n";
-    fprintf aout "\tmovq %%rdi, -24(%%rbp)\n";
+    fprintf aout "\tmovq %%rdi, -48(%%rbp)\n";
     fprintf aout "\tmovl $0, -4(%%rbp)\n";
     fprintf aout "\tjmp .L7\n";
     fprintf aout ".L8:\n";
@@ -1473,7 +1473,7 @@ in
     fprintf aout ".L7:\n";
     fprintf aout "\tmovl -4(%%rbp), %%eax\n";
     fprintf aout "\tmovl %%eax, %%edx\n";
-    fprintf aout "\tmovq -24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq -48(%%rbp), %%rax\n";
     fprintf aout "\taddq %%rdx, %%rax\n";
     fprintf aout "\tmovzbl (%%rax), %%eax\n";
     fprintf aout "\ttestb %%al, %%al\n";
@@ -1505,48 +1505,48 @@ in
     fprintf aout "\tpushq	%%rbx\n";
     fprintf aout "\tsubq	$40, %%rsp\n";
     fprintf aout "\t.cfi_offset 3, -24\n";
-    fprintf aout "\tmovq	%%rdi, -40(%%rbp)\n";
-    fprintf aout "\tmovq	%%rsi, -48(%%rbp)\n";
-    fprintf aout "\tcmpq	$0, -40(%%rbp)\n";
+    fprintf aout "\tmovq	%%rdi, -80(%%rbp)\n";
+    fprintf aout "\tmovq	%%rsi, -96(%%rbp)\n";
+    fprintf aout "\tcmpq	$0, -80(%%rbp)\n";
     fprintf aout "\tjne	.L11\n";
-    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-96(%%rbp), %%rax\n";
     fprintf aout "\tjmp	.L12\n";
     fprintf aout ".L11:\n";
-    fprintf aout "\tcmpq	$0, -48(%%rbp)\n";
+    fprintf aout "\tcmpq	$0, -96(%%rbp)\n";
     fprintf aout "\tjne	.L13\n";
-    fprintf aout "\tmovq	-40(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-80(%%rbp), %%rax\n";
     fprintf aout "\tjmp	.L12\n";
     fprintf aout ".L13:\n";
-    fprintf aout "\tmovq	-40(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-80(%%rbp), %%rax\n";
     fprintf aout "\tmovq	%%rax, %%rdi\n";
     fprintf aout "\tcall	coolstrlen\n";
     fprintf aout "\tmovl	%%eax, %%ebx\n";
-    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-96(%%rbp), %%rax\n";
     fprintf aout "\tmovq	%%rax, %%rdi\n";
     fprintf aout "\tcall	coolstrlen\n";
     fprintf aout "\taddl	%%ebx, %%eax\n";
     fprintf aout "\taddl	$1, %%eax\n";
-    fprintf aout "\tmovl	%%eax, -28(%%rbp)\n";
-    fprintf aout "\tmovl	-28(%%rbp), %%eax\n";
+    fprintf aout "\tmovl	%%eax, -52(%%rbp)\n";
+    fprintf aout "\tmovl	-52(%%rbp), %%eax\n";
     fprintf aout "\tcltq\n";
     fprintf aout "\tmovl	$1, %%esi\n";
     fprintf aout "\tmovq	%%rax, %%rdi\n";
     fprintf aout "\tcall	calloc@PLT\n";
-    fprintf aout "\tmovq	%%rax, -24(%%rbp)\n";
-    fprintf aout "\tmovl	-28(%%rbp), %%eax\n";
+    fprintf aout "\tmovq	%%rax, -48(%%rbp)\n";
+    fprintf aout "\tmovl	-52(%%rbp), %%eax\n";
     fprintf aout "\tmovslq	%%eax, %%rsi\n";
-    fprintf aout "\tmovq	-48(%%rbp), %%rcx\n";
-    fprintf aout "\tmovq	-40(%%rbp), %%rdx\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-96(%%rbp), %%rcx\n";
+    fprintf aout "\tmovq	-80(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout "\tmovq	%%rcx, %%r8\n";
     fprintf aout "\tmovq	%%rdx, %%rcx\n";
     fprintf aout "\tleaq	.LC0(%%rip), %%rdx\n";
     fprintf aout "\tmovq	%%rax, %%rdi\n";
     fprintf aout "\tmovl	$0, %%eax\n";
     fprintf aout "\tcall	snprintf@PLT\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout ".L12:\n";
-    fprintf aout "\tmovq	-8(%%rbp), %%rbx\n";
+    fprintf aout "\tmovq	-16(%%rbp), %%rbx\n";
     fprintf aout "\tleave\n";
     fprintf aout "\t.cfi_def_cfa 7, 8\n";
     fprintf aout "\tret\n";
@@ -1567,61 +1567,61 @@ in
     fprintf aout "\t.cfi_offset 6, -16\n";
     fprintf aout "\tmovq	%%rsp, %%rbp\n";
     fprintf aout "\t.cfi_def_cfa_register 6\n";
-    fprintf aout "\tsubq	$32, %%rsp\n";
+    fprintf aout "\tsubq	$64, %%rsp\n";
     fprintf aout "\tmovq	%%fs:40, %%rax\n";
-    fprintf aout "\tmovq	%%rax, -8(%%rbp)\n";
+    fprintf aout "\tmovq	%%rax, -16(%%rbp)\n";
     fprintf aout "\txorl	%%eax, %%eax\n";
-    fprintf aout "\tmovq	$0, -32(%%rbp)\n";
-    fprintf aout "\tmovq	$0, -24(%%rbp)\n";
+    fprintf aout "\tmovq	$0, -64(%%rbp)\n";
+    fprintf aout "\tmovq	$0, -48(%%rbp)\n";
     fprintf aout "\tmovq	stdin(%%rip), %%rdx\n";
-    fprintf aout "\tleaq	-24(%%rbp), %%rcx\n";
-    fprintf aout "\tleaq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tleaq	-48(%%rbp), %%rcx\n";
+    fprintf aout "\tleaq	-64(%%rbp), %%rax\n";
     fprintf aout "\tmovq	%%rcx, %%rsi\n";
     fprintf aout "\tmovq	%%rax, %%rdi\n";
     fprintf aout "\tcall	getline@PLT\n";
-    fprintf aout "\tmovq	%%rax, -16(%%rbp)\n";
-    fprintf aout "\tcmpq	$-1, -16(%%rbp)\n";
+    fprintf aout "\tmovq	%%rax, -32(%%rbp)\n";
+    fprintf aout "\tcmpq	$-1, -32(%%rbp)\n";
     fprintf aout "\tje	.L15\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rax\n";
     fprintf aout "\ttestq	%%rax, %%rax\n";
     fprintf aout "\tjne	.L16\n";
     fprintf aout ".L15:\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rax\n";
     fprintf aout "\tmovq	%%rax, %%rdi\n";
     fprintf aout "\tcall	free@PLT\n";
     fprintf aout "\tmovl	$1, %%edi\n";
     fprintf aout "\tcall	malloc@PLT\n";
-    fprintf aout "\tmovq	%%rax, -32(%%rbp)\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	%%rax, -64(%%rbp)\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rax\n";
     fprintf aout "\tmovb	$0, (%%rax)\n";
     fprintf aout "\tjmp	.L17\n";
     fprintf aout ".L16:\n";
-    fprintf aout "\tmovq	-16(%%rbp), %%rdx\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rax\n";
     fprintf aout "\tmovl	$0, %%esi\n";
     fprintf aout "\tmovq	%%rax, %%rdi\n";
     fprintf aout "\tcall	memchr@PLT\n";
     fprintf aout "\ttestq	%%rax, %%rax\n";
     fprintf aout "\tje	.L18\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rax\n";
     fprintf aout "\tmovb	$0, (%%rax)\n";
     fprintf aout "\tjmp	.L17\n";
     fprintf aout ".L18:\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rdx\n";
-    fprintf aout "\tmovq	-16(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
     fprintf aout "\tsubq	$1, %%rax\n";
     fprintf aout "\taddq	%%rdx, %%rax\n";
     fprintf aout "\tmovzbl	(%%rax), %%eax\n";
     fprintf aout "\tcmpb	$10, %%al\n";
     fprintf aout "\tjne	.L17\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rdx\n";
-    fprintf aout "\tsubq	$1, -16(%%rbp)\n";
-    fprintf aout "\tmovq	-16(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rdx\n";
+    fprintf aout "\tsubq	$1, -32(%%rbp)\n";
+    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
     fprintf aout "\taddq	%%rdx, %%rax\n";
     fprintf aout "\tmovb	$0, (%%rax)\n";
     fprintf aout ".L17:\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rax\n";
-    fprintf aout "\tmovq	-8(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-16(%%rbp), %%rdx\n";
     fprintf aout "\tsubq	%%fs:40, %%rdx\n";
     fprintf aout "\tje	.L20\n";
     fprintf aout "\tcall	__stack_chk_fail@PLT\n";
@@ -1646,20 +1646,20 @@ in
     fprintf aout "\t.cfi_offset 6, -16\n";
     fprintf aout "\tmovq	%%rsp, %%rbp\n";
     fprintf aout "\t.cfi_def_cfa_register 6\n";
-    fprintf aout "\tsubq	$48, %%rsp\n";
-    fprintf aout "\tmovq	%%rdi, -24(%%rbp)\n";
-    fprintf aout "\tmovq	%%rsi, -32(%%rbp)\n";
-    fprintf aout "\tmovq	%%rdx, -40(%%rbp)\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rax\n";
+    fprintf aout "\tsubq	$96, %%rsp\n";
+    fprintf aout "\tmovq	%%rdi, -48(%%rbp)\n";
+    fprintf aout "\tmovq	%%rsi, -64(%%rbp)\n";
+    fprintf aout "\tmovq	%%rdx, -80(%%rbp)\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rax\n";
     fprintf aout "\tmovq	%%rax, %%rdi\n";
     fprintf aout "\tcall	coolstrlen\n";
     fprintf aout "\tmovl	%%eax, -4(%%rbp)\n";
-    fprintf aout "\tcmpq	$0, -32(%%rbp)\n";
+    fprintf aout "\tcmpq	$0, -64(%%rbp)\n";
     fprintf aout "\tjs	.L22\n";
-    fprintf aout "\tcmpq	$0, -40(%%rbp)\n";
+    fprintf aout "\tcmpq	$0, -80(%%rbp)\n";
     fprintf aout "\tjs	.L22\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rdx\n";
-    fprintf aout "\tmovq	-40(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-80(%%rbp), %%rax\n";
     fprintf aout "\taddq	%%rax, %%rdx\n";
     fprintf aout "\tmovl	-4(%%rbp), %%eax\n";
     fprintf aout "\tcltq\n";
@@ -1669,9 +1669,9 @@ in
     fprintf aout "\tmovl	$0, %%eax\n";
     fprintf aout "\tjmp	.L24\n";
     fprintf aout ".L23:\n";
-    fprintf aout "\tmovq	-40(%%rbp), %%rax\n";
-    fprintf aout "\tmovq	-32(%%rbp), %%rcx\n";
-    fprintf aout "\tmovq	-24(%%rbp), %%rdx\n";
+    fprintf aout "\tmovq	-80(%%rbp), %%rax\n";
+    fprintf aout "\tmovq	-64(%%rbp), %%rcx\n";
+    fprintf aout "\tmovq	-48(%%rbp), %%rdx\n";
     fprintf aout "\taddq	%%rcx, %%rdx\n";
     fprintf aout "\tmovq	%%rax, %%rsi\n";
     fprintf aout "\tmovq	%%rdx, %%rdi\n";
