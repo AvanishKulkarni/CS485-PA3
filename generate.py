@@ -4,7 +4,7 @@ import random
 INT_MIN = -50
 # INT_MAX = 2_147_483_647
 INT_MAX = 50
-OPERATORS = ['<', '<=', '=']
+OPERATORS = ['<', '<=', '=', 'not']
 
 def random_number():
   num = random.randint(INT_MIN, INT_MAX)
@@ -21,10 +21,12 @@ def generate_expression(depth=0, max_depth=3):
   right = generate_expression(depth + 1, max_depth)
   operator = random_operator()
 
-  if operator == '/' and right == '0':
-    right = str(random.randint(1, INT_MAX)) 
+  if operator == 'not':
+    return f'(not {left} = {right})'
+  else:
+    return f'({left} {operator} {right})'
 
-  return f'({left} {operator} {right})'
+  
 
 # Generate a random expression with nesting
 random_expression = generate_expression()
@@ -34,6 +36,6 @@ with open(r"test/arithmetic_random.cl", "w") as file:
   file.write("    if (")
   file.write(random_expression)
   file.write(")\n")
-  file.write("then out_int(1) else out_int(0) fi")
+  file.write("    then\n      out_int(1)\n    else\n      out_int(0)\n    fi\n")
   file.write("  };\n")
   file.write("};\n")
