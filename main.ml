@@ -867,9 +867,15 @@ let main() = (
       fprintf fout "\n\t## %s(...)\n" mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
-      List.iteri (fun i _ -> 
-        stackOffset := !stackOffset + 8;
-        fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);) args_vars;
+      List.iteri (fun i var -> 
+        let var = (tac_expr_to_name var) in
+        if not(Hashtbl.mem envtable var) then (
+          stackOffset := !stackOffset + 8;
+        fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);
+        ) else (
+          fprintf fout "\tpushq %d(%%rbp)\n" (Hashtbl.find envtable var);
+        )
+        ) args_vars;
 
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\t## load %s.vtable\n" cname;
