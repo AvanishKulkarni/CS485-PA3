@@ -13,23 +13,36 @@ def random_number():
 def random_operator():
   return random.choice(OPERATORS)
 
-def generate_expression(depth=0, max_depth=3):
-  if depth >= max_depth or random.random() < 0.1:  # Base case
-    return str(random_number())
-  
-  left = generate_expression(depth + 1, max_depth)
-  right = generate_expression(depth + 1, max_depth)
-  operator = random_operator()
+import random
 
-  if operator == 'not':
-    return f'(not {left} = {right})'
-  else:
-    return f'({left} {operator} {right})'
+def generate_expression(variables, depth=3, is_boolean=False):
+    if depth == 0:
+        # Base case: create a simple negated integer
+        value = random.choice(variables)
+        return f"~{value}"
 
-  
+    if is_boolean:
+        # Generate Boolean expressions
+        left = generate_expression(variables, depth - 1)
+        right = generate_expression(variables, depth - 1)
+        return f"({left} = {right})"  # Boolean equality
+
+    # Generate integer expressions
+    left = generate_expression(variables, depth - 1, is_boolean=False)
+    right = generate_expression(variables, depth - 1, is_boolean=False)
+    operator = random.choice(["<", "<=", "="])  # Valid comparison operators for integers
+
+    # Switch to Boolean context for deeper levels
+    if depth - 1 > 0:
+        boolean_part = f"(not {generate_expression(variables, depth - 1, is_boolean=True)})"
+        return f"(({left} {operator} {right}) = {boolean_part})"
+    else:
+        return f"({left} {operator} {right})"
+
+variables = [1, 2, 16, 28, 42, 50]  # Sample integer values
+random_expression = generate_expression(variables, depth=3)
 
 # Generate a random expression with nesting
-random_expression = generate_expression()
 with open(r"test/arithmetic_random.cl", "w") as file:
   file.write("class Main inherits IO {\n")
   file.write("  main() : Object {\n")
