@@ -637,7 +637,7 @@ let main() = (
   let output_tac_helper fout tac_instructions = (
       match tac_instructions with
       | TAC_Assign_Identifier(var, i) ->
-        fprintf fout "%s <- %s\n" var i
+        fprintf fout "%s <- %s # Identifier\n" var i
       | TAC_Assign_Int(var, i) ->
         fprintf fout "%s <- int %s\n" var i
       | TAC_Assign_Bool(var, i) ->
@@ -675,7 +675,7 @@ let main() = (
       | TAC_Assign_Default(var, name) ->
         fprintf fout "%s <- default %s\n" var name;
       | TAC_Assign_Assign(var, i) ->
-        fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
+        fprintf fout "%s <- %s # Assign\n" var (tac_expr_to_name i);
       | TAC_Branch_True(cond, label) -> 
         fprintf fout "bt %s %s\n" cond label; 
       | TAC_Comment(comment) ->
