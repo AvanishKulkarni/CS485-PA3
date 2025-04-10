@@ -784,8 +784,10 @@ let main() = (
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
       fprintf fout "\tmovq 24(%%r15), %%rax\n";
-      fprintf fout "\tmovq $0, %%rdx\n";
+      fprintf fout "\txorq %%rdx, %%rdx\n";
       fprintf fout "\tcqto\n";
+      fprintf fout "\tandq %%r14, %%r14\n";
+      fprintf fout "\tjz div_by_zero_error\n";
       fprintf fout "\tidivq %%r14\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Int";
@@ -987,6 +989,7 @@ in
   Hashtbl.add asm_strings "%ld" "percent.ld";
   Hashtbl.add asm_strings "" "the.empty.string";
   Hashtbl.add asm_strings "ERROR: 0: Exception: String.substr out of range\\n" "substr.error.string";
+  Hashtbl.add asm_strings "ERROR: division by zero\\n" "div.zero.string";
   Hashtbl.add asm_strings "abort\\n" "abort.string";
 
   let class_map, impl_map, _, ast = cltype in (
@@ -1727,6 +1730,12 @@ in
     fprintf aout "\tjmp eq_handler_end\n";
     fprintf aout ".globl eq_handler_end\neq_handler_end:\n";
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+
+    (* print out division by zero handler *)
+    fprintf aout "\n## DIV_BY_ZERO_ERROR\n";
+    fprintf aout ".globl div_by_zero_error\ndiv_by_zero_error:\n";
+    fprintf aout "\tmovl $1, %%edi\n";
+    fprintf aout "\tcall exit\n";
 
     (* print out program start *)
 
