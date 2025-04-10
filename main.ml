@@ -802,7 +802,7 @@ let main() = (
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tcall lt_handler\n";
-      fprintf fout "\taddq $16, %%rsp\n";
+      (* fprintf fout "\taddq $16, %%rsp\n"; *)
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
@@ -817,7 +817,7 @@ let main() = (
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tcall le_handler\n";
-      fprintf fout "\taddq $16, %%rsp\n";
+      (* fprintf fout "\taddq $16, %%rsp\n"; *)
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
@@ -832,7 +832,7 @@ let main() = (
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tcall eq_handler\n";
-      fprintf fout "\taddq $16, %%rsp\n";
+      (* fprintf fout "\taddq $16, %%rsp\n"; *)
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
