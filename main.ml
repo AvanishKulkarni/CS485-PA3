@@ -787,11 +787,13 @@ let main() = (
     | TAC_Assign_Lt(var, i1, i2) ->
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-      fprintf fout "\tmovq 24(%%r14), %%rdi\n";
+      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-      fprintf fout "\tmovq 24(%%r15), %%rsi\n";
+      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall lt_handler\n";
-      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
@@ -800,11 +802,13 @@ let main() = (
     | TAC_Assign_Le(var, i1, i2) ->
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-      fprintf fout "\tmovq 24(%%r14), %%rdi\n";
+      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-      fprintf fout "\tmovq 24(%%r15), %%rsi\n";
+      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall le_handler\n";
-      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
@@ -813,11 +817,13 @@ let main() = (
     | TAC_Assign_Eq(var, i1, i2) ->
       stackOffset := !stackOffset +8;
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-      fprintf fout "\tmovq 24(%%r14), %%rdi\n";
+      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovsxd %%edi, %%rdi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+8);
-      fprintf fout "\tmovq 24(%%r15), %%rsi\n";
+      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovsxd %%esi, %%rsi\n";
       fprintf fout "\tcall eq_handler\n";
-      fprintf fout "\taddq $24, %%rsp\n";
+      fprintf fout "\taddq $8, %%rsp\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Bool";
       fprintf fout "\tpopq %%rax\n";
