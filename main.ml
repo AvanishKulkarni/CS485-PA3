@@ -115,6 +115,7 @@ let labelCount = ref 1;;
 
 let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
 let envtable : (string, int) Hashtbl.t = Hashtbl.create 255
+let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 
 
 let main() = (
   Printexc.record_backtrace true;
@@ -743,7 +744,8 @@ let main() = (
     | TAC_Assign_String(var, i) ->
       (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
       funRetFlag := ""; *)
-      fprintf fout "%s <- string\n%s\n" var i
+      fprintf fout "\n\t## String Constant %s\n" i;
+      Hashtbl.add asm_strings i ("string"^i);
     | TAC_Assign_Plus(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
@@ -1089,9 +1091,6 @@ in
     )) content;
     fprintf fout ".byte 0\n\n" (* null terminator *)
   ) in 
-
-
-  let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 in
   
   Hashtbl.add asm_strings "%d" "percent.d";
   Hashtbl.add asm_strings "%ld" "percent.ld";

@@ -8,14 +8,26 @@ fname="${input%.*}"
 echo "testing: $fname"
 
 cool --type "$fname.cl"
+cool --out "$fname"_ref --x86 "$fname".cl
 ./main "$fname.cl-type"
 echo "$fname.s generated"
 gcc "$fname.s" --static --no-pie 
 echo "a.out generated"
 
-echo "our output:"
-./a.out < "$fname.cl-input"
-echo ""
-echo "cool ref output:"
-cool "$fname.cl" < "$fname.cl-input"
-echo ""
+if [ -e "$fname.cl-input" ]; then 
+    echo "our output:"
+    ./a.out < "$fname.cl-input"
+    echo
+    echo "cool ref output:"
+    cool "$fname.cl" < "$fname.cl-input"
+    echo
+else 
+    echo "our output:"
+    ./a.out
+    echo
+    echo "cool ref output:"
+    cool "$fname.cl"
+    echo
+fi
+
+
