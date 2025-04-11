@@ -863,8 +863,7 @@ let main() = (
       call_new fout "Int";
       fprintf fout "\tpopq %%rdi\n";
       fprintf fout "\tmovl %%edi, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
-      stackOffset := !stackOffset -16;
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset + 16);
     | TAC_Assign_BoolNegate(var, i) ->
       (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := ""; *)
@@ -876,8 +875,7 @@ let main() = (
       call_new fout "Int";
       fprintf fout "\tpopq %%r14\n";
       fprintf fout "\tmovq %%r14, 24(%%r13)\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
-      stackOffset := !stackOffset -16;
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_NullCheck(var, i) ->
       (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := ""; *) (* check if this is a tempporary, if so then delete*)
