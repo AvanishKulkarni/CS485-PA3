@@ -1,5 +1,6 @@
 import random
 from generate_bool import gen_cond
+from generate_arith import gen_arith
 
 def rand_int():
     return random.randint(1, 100)
@@ -24,6 +25,6 @@ with open(r"test/cond_random.cl", "w") as file:
   file.write("    if (")
   file.write(nested_conditions)
   file.write(")\n")
-  file.write("    then\n      out_int(1)\n    else\n      out_int(0)\n    fi\n")
+  file.write(f"    then\n      out_int({gen_arith(depth=5)})\n    else\n      out_int({gen_arith(depth=5)})\n    fi\n")
   file.write("  };\n")
   file.write("};\n")
