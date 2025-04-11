@@ -44,3 +44,4 @@ reference_output.txt
 test_output.txt
 test/*
 output.txt
+*.pyc

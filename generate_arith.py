@@ -2,9 +2,9 @@ import random
 
 def gen_arith(depth=0, max_depth=5, input=[random.randint(1, 100) for _ in range(100)]):
     if depth >= max_depth:
-        return str(random.choice(input))
+        return f"{random.choice(input)} <- {random.choice(input)}"
 
-    operator = random.choice(["+", "-", "*"])
+    operator = random.choice(["+", "-", "*",])
 
     if random.random() < 0.5:
         return f"~({gen_arith(depth + 1, max_depth, input=input)})"

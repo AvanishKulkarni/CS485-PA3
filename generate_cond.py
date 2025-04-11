@@ -17,7 +17,7 @@ def generate_condition(depth=0, max_depth=3):
     return f"if ({gen_cond(variables, depth=3)}) then ({then_branch}) else ({else_branch}) fi"
 
 # Generate the nested conditional string
-nested_conditions = generate_condition(max_depth=10)
+nested_conditions = generate_condition(max_depth=0)
 
 with open(r"test/cond_random.cl", "w") as file:
     file.write("class Main inherits IO {\n")
@@ -32,7 +32,7 @@ with open(r"test/cond_random.cl", "w") as file:
     file.write("    if (")
     file.write(nested_conditions)
     file.write(")\n")
-    file.write(f"    then\n      out_int({gen_arith(depth=5)})\n    else\n      out_int({gen_arith(depth=5)})\n    fi;")
+    file.write(f"    then\n      out_int(1)\n    else\n      out_int(0)\n    fi;")
     file.write("}\n")
     file.write("  };\n")
     file.write("};\n")
