@@ -802,6 +802,7 @@ let main() = (
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tandq $-16, %%rsp\n";
       fprintf fout "\tcall lt_handler\n";
       (* fprintf fout "\taddq $16, %%rsp\n"; *)
       fprintf fout "\tpushq %%rax\n";
@@ -817,6 +818,7 @@ let main() = (
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tandq $-16, %%rsp\n";
       fprintf fout "\tcall le_handler\n";
       (* fprintf fout "\taddq $16, %%rsp\n"; *)
       fprintf fout "\tpushq %%rax\n";
@@ -832,6 +834,7 @@ let main() = (
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
       fprintf fout "\tmovq %d(%%rbp), %%r15\n" (!stackOffset+16);
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tandq $-16, %%rsp\n";
       fprintf fout "\tcall eq_handler\n";
       (* fprintf fout "\taddq $16, %%rsp\n"; *)
       fprintf fout "\tpushq %%rax\n";
@@ -843,7 +846,9 @@ let main() = (
       (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := ""; *)
       fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+16);
-      fprintf fout "\tnegq 24(%%r14)\n";
+      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tnegl %%edi\n";
+      fprintf fout "\tmovl %%edi, 24(%%r14)\n";
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+16);
     | TAC_Assign_BoolNegate(var, i) ->
       (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
@@ -976,7 +981,7 @@ in
   let print_calloc fout nmemb msize = (
     fprintf fout "\tmovq $%d, %%rdi\n" nmemb;
     fprintf fout "\tmovq $%d, %%rsi\n" msize;
-    fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+    fprintf aout "\tandq $-16, %%rsp\n";
     fprintf fout "\tcall calloc\n";
     fprintf fout "\tmovq %%rax, %%r12\n";
   ) in
@@ -1143,7 +1148,7 @@ in
           fprintf aout "\tmovq stdin(%%rip), %%rdx\n";
           fprintf aout "\n";
           fprintf aout "\t## guarantee 16-byte alignment before call\n";
-          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall fgets\n";
           fprintf aout "\tmovq %%rax, %%r15\n";
           fprintf aout "\n";
@@ -1162,7 +1167,7 @@ in
           fprintf aout "\tmovq $0, (%%r13)\n"; (* ensure default value is 0 *)
           fprintf aout "\n";
           fprintf aout "\t## guarantee 16-byte alignment before call\n";
-          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall sscanf\n";
           fprintf aout "\n";
 
@@ -1205,7 +1210,7 @@ in
           fprintf aout "\tpopq %%rbp\n";
           fprintf aout "\tmovq %%r13, %%r14\n";
           fprintf aout "\t## guarantee 16-byte alignment before call\n";
-          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall coolgetstr\n";
           fprintf aout "\tmovq %%rax, %%r13\n";
           fprintf aout "\tmovq %%r13, 24(%%r14)\n";
@@ -1221,7 +1226,7 @@ in
           fprintf aout "\tcdqe\n";
           fprintf aout "\tmovq %%rax, %%rsi\n";
           fprintf aout "\tmovl $0, %%eax\n";
-          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall printf\n";
           fprintf aout "\tmov %%r12, %%r13\n";
         )
@@ -1232,7 +1237,7 @@ in
           fprintf aout "\tmovq 24(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r13\n";
           fprintf aout "\t## guarantee 16-byte alignment before call\n";
-          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tmovq %%r13, %%rdi\n";
           fprintf aout "\tcall cooloutstr\n";
           fprintf aout "\tmovq %%r12, %%r13\n";
@@ -1250,7 +1255,7 @@ in
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
           fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tmovq 8(%%r12), %%r14\n";
-          fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tmovq $8, %%rsi\n";
           fprintf aout "\tmovq %%r14, %%rdi\n";
           fprintf aout "\tmovq %%rax, %%r13\n";
@@ -1754,7 +1759,7 @@ in
     fprintf aout "\tmovq $Main.main, %%r14\n";
     fprintf aout "\tcall *%%r14\n";
     fprintf aout "\t## guarantee 16-byte alignment before call\n";
-    fprintf aout "\tandq $0xFFFFFFFFFFFFFFF0, %%rsp\n";
+    fprintf aout "\tandq $-16, %%rsp\n";
     fprintf aout "\tmovl $0, %%edi\n";
     fprintf aout "\tcall exit\n";
 

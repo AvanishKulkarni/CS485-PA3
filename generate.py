@@ -6,20 +6,16 @@ INT_MIN = -64
 INT_MAX = 64
 OPERATORS = ['<', '<=', '=', 'not']
 
-def random_number():
-  num = random.randint(INT_MIN, INT_MAX)
-  return f'~{abs(num)}' if num < 0 else str(num)
-
-def random_operator():
-  return random.choice(OPERATORS)
-
 import random
 
 def generate_expression(variables, depth=3, is_boolean=False):
   if depth == 0:
     # Base case: create a simple negated integer
     value = random.choice(variables)
-    return f"~{value}"
+    if random.random() < 0.5:
+      return f"~{value}"
+    else:
+      return f"{value}"
 
   if is_boolean:
     # Generate Boolean expressions
@@ -30,7 +26,7 @@ def generate_expression(variables, depth=3, is_boolean=False):
   # Generate integer expressions
   left = generate_expression(variables, depth - 1, is_boolean=False)
   right = generate_expression(variables, depth - 1, is_boolean=False)
-  operator = random.choice(["<"])  # Valid comparison operators for integers
+  operator = random.choice(["<", "<=", "="])  # Valid comparison operators for integers
 
   # Switch to Boolean context for deeper levels
   if depth - 1 > 0:
@@ -39,8 +35,8 @@ def generate_expression(variables, depth=3, is_boolean=False):
   else:
     return f"({left} {operator} {right})"
 
-variables = [chr(c) for c in range(ord('a'), ord('e')+1)]  # Sample integer values
-random_expression = generate_expression(variables, depth=3)
+variables = [chr(c) for c in range(ord('a'), ord('d')+1)]  # Sample integer values
+random_expression = generate_expression(variables, depth=10)
 
 # Generate a random expression with nesting
 with open(r"test/arithmetic_random.cl", "w") as file:
