@@ -4,7 +4,6 @@ import random
 INT_MIN = -64
 # INT_MAX = 2_147_483_647
 INT_MAX = 64
-OPERATORS = ['<', '<=', '=', 'not']
 
 import random
 
@@ -38,7 +37,6 @@ def generate_expression(variables, depth=3, is_boolean=False):
 variables = [chr(c) for c in range(ord('a'), ord('d')+1)]  # Sample integer values
 random_expression = generate_expression(variables, depth=10)
 
-# Generate a random expression with nesting
 with open(r"test/arithmetic_random.cl", "w") as file:
   file.write("class Main inherits IO {\n")
   file.write("  main() : Object {\n")
