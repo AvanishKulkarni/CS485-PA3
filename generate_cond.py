@@ -5,7 +5,7 @@ from generate_arith import gen_arith
 def rand_int():
     return random.randint(1, 100)
 
-variables = [rand_int() for _ in range(100)]
+variables = [chr(c) for c in range(ord('a'), ord('z')+1)]
 
 def generate_condition(depth=0, max_depth=3):
     if depth >= max_depth:
@@ -20,11 +20,23 @@ def generate_condition(depth=0, max_depth=3):
 nested_conditions = generate_condition(max_depth=10)
 
 with open(r"test/cond_random.cl", "w") as file:
-  file.write("class Main inherits IO {\n")
-  file.write("  main() : Object {\n")
-  file.write("    if (")
-  file.write(nested_conditions)
-  file.write(")\n")
-  file.write(f"    then\n      out_int({gen_arith(depth=5)})\n    else\n      out_int({gen_arith(depth=5)})\n    fi\n")
-  file.write("  };\n")
-  file.write("};\n")
+    file.write("class Main inherits IO {\n")
+    file.write("  main() : Object {\n")
+    file.write("    let\n")
+    for i in range(len(variables)-1):
+        file.write(f'    {variables[i]} : Int,\n')
+    file.write(f'    {variables[-1]} : Int\n')
+    file.write("    in {\n")
+    for var in variables:
+        file.write(f'    {var} <- in_int();\n')
+    file.write("    if (")
+    file.write(nested_conditions)
+    file.write(")\n")
+    file.write(f"    then\n      out_int({gen_arith(depth=5)})\n    else\n      out_int({gen_arith(depth=5)})\n    fi;")
+    file.write("}\n")
+    file.write("  };\n")
+    file.write("};\n")
+
+with open(r"test/cond_random.cl-input", "w") as file:
+    for i in range(len(variables)):
+        file.write(f"{random.randint(-1024, 1024)}\n")

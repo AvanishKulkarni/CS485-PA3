@@ -10,7 +10,7 @@ import random
 
 def gen_cond(variables, depth=3, is_boolean=False):
   if depth == 0:
-    value = gen_arith(depth=1)
+    value = gen_arith(depth=1, input=variables)
     return value
 
   if is_boolean:
@@ -32,7 +32,7 @@ def gen_cond(variables, depth=3, is_boolean=False):
     return f"({left} {operator} {right})"
 
 if __name__ == "__main__":
-  variables = [chr(c) for c in range(ord('a'), ord('d')+1)]  # Sample integer values
+  variables = [chr(c) for c in range(ord('a'), ord('d')+1)]
   random_expression = gen_cond(variables, depth=5)
 
   with open(r"test/arithmetic_random.cl", "w") as file:
