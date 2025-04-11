@@ -15,6 +15,8 @@ echo "a.out generated"
 
 echo "our output:"
 ./a.out < "$fname.cl-input"
+echo
 
 echo "cool ref output:"
 cool "$fname.cl" < "$fname.cl-input"
+echo
