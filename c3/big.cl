@@ -5,6 +5,7 @@ class Main inherits IO {
              x <- 10;  -- input 1
              y <- 2;  -- input 2
              z <- x * y + (x - y) / y; -- avoid div by zero 14
+             out_int(z);
              cond1 <- if x < y then
                          if not (z = 0) then true else false fi
                       else false
@@ -38,6 +39,7 @@ class Main inherits IO {
                 let m: Int, n: Int, check: Bool in {
                    m <- z * z + x; -- 14 * 14 + 10 = 206
                    n <- (y + 2) * (x - 3); -- 4 * 7 = 21
+                   out_int(m);
                    out_int(n);
                    check <- if m = n then
                                true
@@ -51,7 +53,7 @@ class Main inherits IO {
                    if check then {
                       out_int(m); -- output 3
                    } else {
-                      (* out_int(n); *)0; -- output 4
+                      out_int(n); -- output 4
                    }fi;
                 };
              }fi;

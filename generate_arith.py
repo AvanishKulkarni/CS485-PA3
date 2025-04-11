@@ -18,6 +18,6 @@ def gen_arith(depth=0, max_depth=5, input=[random.randint(1, 100) for _ in range
     return f"({left_operand} {operator} {right_operand})"
 
 if __name__ == "__main__":
-  letters = [chr(c) for c in range(ord('a'), ord('d')+1)]
+  letters = [chr(c) for c in range(ord('a'), ord('z')+1)]
   nested_expression = gen_arith(input=letters)
   print(nested_expression)

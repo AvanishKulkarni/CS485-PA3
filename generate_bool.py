@@ -32,7 +32,7 @@ def gen_cond(variables, depth, is_boolean=False):
     return f"({left} {operator} {right})"
 
 if __name__ == "__main__":
-  variables = [chr(c) for c in range(ord('a'), ord('d')+1)]
+  variables = [chr(c) for c in range(ord('a'), ord('z')+1)]
   random_expression = gen_cond(variables, depth=5)
 
   with open(r"test/arithmetic_random.cl", "w") as file:

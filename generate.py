@@ -5,7 +5,7 @@ from generate_arith import gen_arith
 def rand_int():
     return random.randint(1, 100)
 
-variables = [chr(c) for c in range(ord('a'), ord('b')+1)]
+variables = [chr(c) for c in range(ord('a'), ord('z')+1)]
 
 def gen_prog(depth=3):
     if depth <= 0:
@@ -14,10 +14,10 @@ def gen_prog(depth=3):
     then_branch = gen_prog(depth - 1)
     else_branch = gen_prog(depth - 1)
 
-    return f"if ({gen_cond(variables, depth=1)})\n"
+    return f"if ({gen_cond(variables, depth)})\n"
 
 # Generate the nested conditional string
-nested_conditions = gen_prog(depth=1)
+nested_conditions = gen_prog(depth=5)
 
 with open(r"test/cond_random.cl", "w") as file:
     file.write("class Main inherits IO {\n")
