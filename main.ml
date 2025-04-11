@@ -839,14 +839,14 @@ let main() = (
       ) else (
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
-      fprintf fout "\tmovq 24(%%r15), %%rax\n";
+      fprintf fout "\tmovl 24(%%r15), %%eax\n";
       fprintf fout "\tmovq $0, %%rdx\n";
-      fprintf fout "\tcqto\n";
-      fprintf fout "\tidivq %%r14\n";
+      fprintf fout "\tcltd\n";
+      fprintf fout "\tidivl %%r14d\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Int";
       fprintf fout "\tpopq %%rax\n";
-      fprintf fout "\tmovq %%rax, 24(%%r13)\n";
+      fprintf fout "\tmovl %%eax, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
       stackOffset := !stackOffset -16;
     | TAC_Assign_Lt(var, i1, i2) ->
