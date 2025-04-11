@@ -8,9 +8,9 @@ INT_MAX = 64
 
 import random
 
-def gen_cond(variables, depth=3, is_boolean=False):
+def gen_cond(variables, depth, is_boolean=False):
   if depth == 0:
-    value = gen_arith(depth=1, input=variables)
+    value = gen_arith(depth=0, input=variables)
     return value
 
   if is_boolean:
