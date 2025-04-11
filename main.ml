@@ -923,7 +923,7 @@ let main() = (
         fprintf fout "\tmovq %d(%%rbp), %%r13\n" (Hashtbl.find envtable cond);
       );
       fprintf fout "\tcmpq $0, 24(%%r13)\n";
-      fprintf fout "\tje %s\n" label;
+      fprintf fout "\tjne %s\n" label;
     | TAC_Comment(comment) ->
       fprintf fout "## %s\n" comment;
     | TAC_Jump(label) -> 
