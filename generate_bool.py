@@ -1,4 +1,5 @@
 import random
+from generate_arith import gen_arith
 
 # INT_MIN = -2_147_483_648
 INT_MIN = -64
@@ -7,50 +8,47 @@ INT_MAX = 64
 
 import random
 
-def generate_expression(variables, depth=3, is_boolean=False):
+def gen_cond(variables, depth=3, is_boolean=False):
   if depth == 0:
-    # Base case: create a simple negated integer
-    value = random.choice(variables)
-    if random.random() < 0.5:
-      return f"~{value}"
-    else:
-      return f"{value}"
+    value = gen_arith(depth=1)
+    return value
 
   if is_boolean:
     # Generate Boolean expressions
-    left = generate_expression(variables, depth - 1)
-    right = generate_expression(variables, depth - 1)
+    left = gen_cond(variables, depth - 1)
+    right = gen_cond(variables, depth - 1)
     return f"({left} = {right})"  # Boolean equality
 
   # Generate integer expressions
-  left = generate_expression(variables, depth - 1, is_boolean=False)
-  right = generate_expression(variables, depth - 1, is_boolean=False)
+  left = gen_cond(variables, depth - 1, is_boolean=False)
+  right = gen_cond(variables, depth - 1, is_boolean=False)
   operator = random.choice(["<", "<=", "="])  # Valid comparison operators for integers
 
   # Switch to Boolean context for deeper levels
   if depth - 1 > 0:
-    boolean_part = f"(not {generate_expression(variables, depth - 1, is_boolean=True)})"
+    boolean_part = f"(not {gen_cond(variables, depth - 1, is_boolean=True)})"
     return f"(({left} {operator} {right}) = {boolean_part})"
   else:
     return f"({left} {operator} {right})"
 
-variables = [chr(c) for c in range(ord('a'), ord('d')+1)]  # Sample integer values
-random_expression = generate_expression(variables, depth=10)
+if __name__ == "__main__":
+  variables = [chr(c) for c in range(ord('a'), ord('d')+1)]  # Sample integer values
+  random_expression = gen_cond(variables, depth=5)
 
-with open(r"test/arithmetic_random.cl", "w") as file:
-  file.write("class Main inherits IO {\n")
-  file.write("  main() : Object {\n")
-  file.write("    let\n")
-  for i in range(len(variables)-1):
-    file.write(f'    {variables[i]} : Int,\n')
-  file.write(f'    {variables[-1]} : Int\n')
-  file.write("    in {\n")
-  for var in variables:
-    file.write(f'    {var} <- in_int();\n')
-    
-  file.write("    if (")
-  file.write(random_expression)
-  file.write(")\n")
-  file.write("    then\n      out_int(1)\n    else\n      out_int(0)\n    fi;}\n")
-  file.write("  };\n")
-  file.write("};\n")
+  with open(r"test/arithmetic_random.cl", "w") as file:
+    file.write("class Main inherits IO {\n")
+    file.write("  main() : Object {\n")
+    file.write("    let\n")
+    for i in range(len(variables)-1):
+      file.write(f'    {variables[i]} : Int,\n')
+    file.write(f'    {variables[-1]} : Int\n')
+    file.write("    in {\n")
+    for var in variables:
+      file.write(f'    {var} <- in_int();\n')
+      
+    file.write("    if (")
+    file.write(random_expression)
+    file.write(")\n")
+    file.write("    then\n      out_int(1)\n    else\n      out_int(0)\n    fi;}\n")
+    file.write("  };\n")
+    file.write("};\n")
