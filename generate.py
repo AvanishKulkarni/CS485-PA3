@@ -39,16 +39,24 @@ def generate_expression(variables, depth=3, is_boolean=False):
   else:
     return f"({left} {operator} {right})"
 
-variables = [chr(c) for c in range(ord('a'), ord('z')+1)]  # Sample integer values
-random_expression = generate_expression(variables, depth=5)
+variables = [chr(c) for c in range(ord('a'), ord('e')+1)]  # Sample integer values
+random_expression = generate_expression(variables, depth=3)
 
 # Generate a random expression with nesting
 with open(r"test/arithmetic_random.cl", "w") as file:
   file.write("class Main inherits IO {\n")
   file.write("  main() : Object {\n")
+  file.write("    let\n")
+  for i in range(len(variables)-1):
+    file.write(f'    {variables[i]} : Int,\n')
+  file.write(f'    {variables[-1]} : Int\n')
+  file.write("    in {\n")
+  for var in variables:
+    file.write(f'    {var} <- in_int();\n')
+    
   file.write("    if (")
   file.write(random_expression)
   file.write(")\n")
-  file.write("    then\n      out_int(1)\n    else\n      out_int(0)\n    fi\n")
+  file.write("    then\n      out_int(1)\n    else\n      out_int(0)\n    fi;}\n")
   file.write("  };\n")
   file.write("};\n")
