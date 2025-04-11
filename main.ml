@@ -1027,8 +1027,12 @@ let main() = (
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
       fprintf fout "\n\t## update identifier\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 16);
-      stackOffset := !stackOffset + 16;
+      if not(Hashtbl.mem envtable (tac_expr_to_name i)) then (
+        stackOffset := !stackOffset +16;
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
+      ) else (
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
+      );
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
     | TAC_Branch_True(cond, label) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";); 
