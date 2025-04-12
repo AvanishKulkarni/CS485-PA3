@@ -565,9 +565,11 @@ let main() = (
         let tac_var = Hashtbl.find ident_tac name in
         (* Hashtbl.add ident_tac name (TAC_Variable(var)); *)
         let i, ta = convert exp.exp_kind (fresh_var ())cname mname in
+        let new_var = var in
+        let new_id = TAC_Assign_Identifier(new_var, (tac_expr_to_name tac_var)) in
         let to_output = TAC_Assign_Assign((tac_expr_to_name tac_var), ta) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
-        (i @ [to_output]), (tac_var)
+        !currNode.blocks <- !currNode.blocks @ [to_output] @ [new_id];
+        (i @ [to_output] @ [new_id]), (TAC_Variable(new_var))
       (* Need to finish rest of tac for objects and conditionals*)
       | If (pred, astthen, astelse) -> 
         let thenvar = fresh_var () in 
@@ -665,6 +667,7 @@ let main() = (
     | Negate(a1) -> numTemps a1.exp_kind
     | Isvoid(a1) -> numTemps a1.exp_kind
     | Block(exp) ->
+      List.length exp +
       List.fold_left (fun acc e ->
         max acc (numTemps e.exp_kind)
       ) 0 exp
@@ -685,7 +688,7 @@ let main() = (
     | New((_, name)) -> 0
     | Let(bindlist, let_body) ->
       List.length bindlist + numTemps let_body.exp_kind
-    | Assign((_, name), exp) -> 0 (* same as let *)
+    | Assign((_, name), exp) -> 1 + numTemps exp.exp_kind(* same as let *)
     (* Need to finish rest of tac for objects and conditionals*)
     | If (pred, astthen, astelse) -> 
       let res = max (numTemps pred.exp_kind) (numTemps astthen.exp_kind) in
