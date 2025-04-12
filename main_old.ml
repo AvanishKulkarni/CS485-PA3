@@ -556,28 +556,30 @@ let main() = (
         let tac_var = Hashtbl.find ident_tac name in
         (* Hashtbl.add ident_tac name (TAC_Variable(var)); *)
         let i, ta = convert exp.exp_kind (fresh_var ())cname mname in
+        let new_var = var in
+        let new_id = TAC_Assign_Identifier(new_var, (tac_expr_to_name tac_var)) in
         let to_output = TAC_Assign_Assign((tac_expr_to_name tac_var), ta) in
-        !currNode.blocks <- !currNode.blocks @ [to_output];
-        (i @ [to_output]), (tac_var)
+        !currNode.blocks <- !currNode.blocks @ [to_output] @ [new_id];
+        (i @ [to_output] @ [new_id]), (TAC_Variable(new_var))
       (* Need to finish rest of tac for objects and conditionals*)
       | If (pred, astthen, astelse) -> 
         let thenvar = fresh_var () in 
         let thenlbl = fresh_label cname mname in 
-        let elsevar = fresh_var () in 
+        (* let elsevar = fresh_var () in  *)
         let elselbl = fresh_label cname mname in 
         let joinlbl = fresh_label cname mname in 
         let pinstr, pexp = convert pred.exp_kind (thenvar) cname mname in 
-        let notc = TAC_Assign_BoolNegate(elsevar, pexp) in
-        let bt = TAC_Branch_True(thenvar, thenlbl) in
-        let be = TAC_Branch_True(elsevar, elselbl) in 
+        (* let notc = TAC_Assign_BoolNegate(elsevar, pexp) in *)
+        (* let bt = TAC_Branch_True(thenvar, thenlbl) in *)
+        let be = TAC_Branch_True((tac_expr_to_name pexp), elselbl) in 
         let tcomm = TAC_Comment("then branch") in 
         let tlbl = TAC_Label(thenlbl) in
         let ecomm = TAC_Comment("else branch") in 
         let elbl = TAC_Label(elselbl) in 
-        let jcomm = TAC_Comment("if-join") in 
+        let jcomm = TAC_Comment(sprintf "if-join %s-%s" thenlbl elselbl) in 
         let jlbl = TAC_Label(joinlbl) in 
         let jjmp = TAC_Jump(joinlbl) in 
-        !currNode.blocks <- !currNode.blocks @ [notc] @ [be] @ [bt];
+        !currNode.blocks <- !currNode.blocks @ [be];
         let prevNode : cfg_node = !currNode in
         (* true node*)
         currNode := {
@@ -587,9 +589,9 @@ let main() = (
           true_branch = None;
           false_branch = None;
         };
+        prevNode.true_branch <- Some(!currNode);
         let tinstr, texp = convert astthen.exp_kind (var) cname mname in 
         !currNode.blocks <- !currNode.blocks @ [jjmp];
-        prevNode.true_branch <- Some(!currNode);
         (* false node *)
         currNode := {
           label = elbl;
@@ -598,20 +600,21 @@ let main() = (
           true_branch = None;
           false_branch = None;
         };
+        prevNode.false_branch <- Some(!currNode);
         let einstr, eexp = convert astelse.exp_kind (var) cname mname in 
         !currNode.blocks <- !currNode.blocks @ [jjmp];
-        prevNode.false_branch <- Some(!currNode);
-        (* merge node *)
-        currNode := {
+        let joinNode : cfg_node = {
           label = jlbl;
           comment = jcomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
-        };
-        (* merge_node (prevNode.true_branch); *)
-        merge_node (prevNode.false_branch);
-        pinstr @ [notc] @ [be] @ [bt] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
+        }
+        in
+        (* merge node *)
+       
+        currNode := joinNode;
+        pinstr (* @ [notc] *) @ [be] (* @ [bt]  *)@ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
         let predvar = fresh_var() in 
         let predlblname = fresh_label cname mname in 

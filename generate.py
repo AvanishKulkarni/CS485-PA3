@@ -1,54 +1,41 @@
 import random
+from generate_bool import gen_cond
+from generate_arith import gen_arith
 
-# INT_MIN = -2_147_483_648
-INT_MIN = -50
-# INT_MAX = 2_147_483_647
-INT_MAX = 50
-OPERATORS = ['<', '<=', '=', 'not']
+def rand_int():
+    return random.randint(1, 100)
 
-def random_number():
-  num = random.randint(INT_MIN, INT_MAX)
-  return f'~{abs(num)}' if num < 0 else str(num)
+variables = [chr(c) for c in range(ord('a'), ord('z')+1)]
 
-def random_operator():
-  return random.choice(OPERATORS)
+def gen_prog(depth=3):
+    if depth <= 0:
+        return gen_cond(variables, depth=3)
 
-import random
+    then_branch = gen_prog(depth - 1)
+    else_branch = gen_prog(depth - 1)
 
-def generate_expression(variables, depth=3, is_boolean=False):
-    if depth == 0:
-        # Base case: create a simple negated integer
-        value = random.choice(variables)
-        return f"~{value}"
+    return f"if ({gen_cond(variables, depth)})\n"
 
-    if is_boolean:
-        # Generate Boolean expressions
-        left = generate_expression(variables, depth - 1)
-        right = generate_expression(variables, depth - 1)
-        return f"({left} = {right})"  # Boolean equality
+# Generate the nested conditional string
+nested_conditions = gen_prog(depth=5)
 
-    # Generate integer expressions
-    left = generate_expression(variables, depth - 1, is_boolean=False)
-    right = generate_expression(variables, depth - 1, is_boolean=False)
-    operator = random.choice(["<", "<=", "="])  # Valid comparison operators for integers
+with open(r"test/cond_random.cl", "w") as file:
+    file.write("class Main inherits IO {\n")
+    file.write("  main() : Object {\n")
+    file.write("    let\n")
+    for i in range(len(variables)-1):
+        file.write(f'    {variables[i]} : Int,\n')
+    file.write(f'    {variables[-1]} : Int\n')
+    file.write("    in {\n")
+    for var in variables:
+        file.write(f'    {var} <- in_int();\n')
+    file.write("    ")
+    file.write(nested_conditions)
+    file.write(f"    then\n      out_int(1)\n    else\n      out_int(0)\n    fi;")
+    file.write("}\n")
+    file.write("  };\n")
+    file.write("};\n")
 
-    # Switch to Boolean context for deeper levels
-    if depth - 1 > 0:
-        boolean_part = f"(not {generate_expression(variables, depth - 1, is_boolean=True)})"
-        return f"(({left} {operator} {right}) = {boolean_part})"
-    else:
-        return f"({left} {operator} {right})"
-
-variables = [1, 2, 16, 28, 42, 50]  # Sample integer values
-random_expression = generate_expression(variables, depth=3)
-
-# Generate a random expression with nesting
-with open(r"test/arithmetic_random.cl", "w") as file:
-  file.write("class Main inherits IO {\n")
-  file.write("  main() : Object {\n")
-  file.write("    if (")
-  file.write(random_expression)
-  file.write(")\n")
-  file.write("    then\n      out_int(1)\n    else\n      out_int(0)\n    fi\n")
-  file.write("  };\n")
-  file.write("};\n")
+with open(r"test/cond_random.cl-input", "w") as file:
+    for i in range(len(variables)):
+        file.write(f"{random.randint(-1024, 1024)}\n")
