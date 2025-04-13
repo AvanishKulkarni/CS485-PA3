@@ -538,7 +538,6 @@ let main() = (
                 let var = fresh_var () in
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 let i, ta = convert binit.exp_kind (var) cname mname in
-                Hashtbl.add envtable var (iter * -16);
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Assign(var, ta)];
                 !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Assign(var, ta)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
@@ -1063,6 +1062,7 @@ let main() = (
       funRetFlag := "";
       fprintf fout "\n\t## update identifier\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i)) then (
+        Hashtbl.add envtable (tac_expr_to_name i) !stackOffset; (* this is broken *)
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
       ) else (
