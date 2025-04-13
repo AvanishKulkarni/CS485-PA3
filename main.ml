@@ -530,15 +530,15 @@ let main() = (
         let retTacInstr = ref [] in
         let let_vars = ref [] in
         let removeScope = ref [] in
-        List.iter
-            (fun (Binding ((vloc, vname), (_, typename), binit)) ->
+        List.iteri
+            (fun iter (Binding ((vloc, vname), (_, typename), binit)) ->
               match binit with
               (* [Let-Init] *)
               | Some binit ->
                 let var = fresh_var () in
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 let i, ta = convert binit.exp_kind (var) cname mname in
-                Hashtbl.add envtable var 0;
+                Hashtbl.add envtable var (iter * -16);
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Assign(var, ta)];
                 !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Assign(var, ta)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
