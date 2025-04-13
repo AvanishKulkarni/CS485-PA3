@@ -627,24 +627,55 @@ let main() = (
         merge_node (prevNode.true_branch) (Some(joinNode));
         merge_node (prevNode.false_branch) (Some(joinNode));
         currNode := joinNode;
-        pinstr (* @ [notc] *) @ [be] (* @ [bt]  *)@ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
+        pinstr @ [be] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
-        let predvar = fresh_var() in 
+        (* while labels *)
         let predlblname = fresh_label cname mname in 
         let predlbl = TAC_Label(predlblname) in
-        let notpredvar = fresh_var () in 
-
+        let bodylblname = fresh_label cname mname in 
+        let bodylbl = TAC_Label(bodylblname) in 
         let exitlblname = fresh_label cname mname in 
         let exitlbl = TAC_Label(exitlblname) in
 
+        (* entry/predicate setup *)
+        let predcomm = TAC_Comment("while-pred") in
+        let predvar = fresh_var() in 
+        let notpredvar = fresh_var () in 
         let pinstr, pexp = convert pred.exp_kind predvar cname mname in 
         let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in 
-        
         let bexit = TAC_Branch_True(notpredvar, exitlblname) in 
 
-        let jpred = TAC_Jump(predlblname) in 
+        (* append predicate to currNode *)
+        !currNode.blocks <- !currNode.blocks @ [predcomm] @ [predlbl] @ pinstr @ [notpred] @ [bexit];
 
+        (* body node *)
+        let bodycomm = TAC_Comment("while-body") in
         let binstr, bexp = convert astbody.exp_kind var cname mname in 
+        let jpred = TAC_Jump(predlblname) in 
+        let prevNode : cfg_node = !currNode in
+        currNode := {
+          label = bodylbl;
+          comment = bodycomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+          parent_branches = [Some(prevNode)];
+        };
+        !currNode.blocks <- !currNode.blocks @ binstr @ [jpred];
+        prevNode.false_branch <- Some(!currNode); (* link notpred = false to body node *)
+
+        (* exit node *)
+        let exitcomm = TAC_Comment("while-exit") in
+        let prevNode : cfg_node = !currNode in 
+        currNode := {
+          label = exitlbl;
+          comment = exitcomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+          parent_branches = [Some(prevNode)];
+        };
+        prevNode.true_branch <- Some(!currNode);
 
         [predlbl] @ pinstr @ [notpred] @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
@@ -1040,7 +1071,7 @@ let main() = (
     | TAC_Branch_True(cond, label) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";); 
       funRetFlag := "";
-      fprintf fout "\n\t## conditonal jump\n";
+      fprintf fout "\n\t## conditional jump\n";
       if not(Hashtbl.mem envtable cond) then (
         stackOffset := !stackOffset + 16;
         fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;

@@ -561,7 +561,6 @@ let main() = (
         let to_output = TAC_Assign_Assign((tac_expr_to_name tac_var), ta) in
         !currNode.blocks <- !currNode.blocks @ [to_output] @ [new_id];
         (i @ [to_output] @ [new_id]), (TAC_Variable(new_var))
-      (* Need to finish rest of tac for objects and conditionals*)
       | If (pred, astthen, astelse) -> 
         let thenvar = fresh_var () in 
         let thenlbl = fresh_label cname mname in 
@@ -581,7 +580,7 @@ let main() = (
         let jjmp = TAC_Jump(joinlbl) in 
         !currNode.blocks <- !currNode.blocks @ [be];
         let prevNode : cfg_node = !currNode in
-        (* true node*)
+        (* true node *)
         currNode := {
           label = tlbl;
           comment = tcomm;
@@ -614,24 +613,52 @@ let main() = (
         (* merge node *)
        
         currNode := joinNode;
-        pinstr (* @ [notc] *) @ [be] (* @ [bt]  *)@ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
+        pinstr @ [be] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
-        let predvar = fresh_var() in 
+        (* while labels *)
         let predlblname = fresh_label cname mname in 
         let predlbl = TAC_Label(predlblname) in
-        let notpredvar = fresh_var () in 
-
+        let bodylblname = fresh_label cname mname in 
+        let bodylbl = TAC_Label(bodylblname) in 
         let exitlblname = fresh_label cname mname in 
         let exitlbl = TAC_Label(exitlblname) in
 
+        (* entry/predicate setup *)
+        let predvar = fresh_var() in 
+        let notpredvar = fresh_var () in 
         let pinstr, pexp = convert pred.exp_kind predvar cname mname in 
         let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in 
-        
         let bexit = TAC_Branch_True(notpredvar, exitlblname) in 
 
-        let jpred = TAC_Jump(predlblname) in 
+        (* append predicate to currNode *)
+        !currNode.blocks <- !currNode.blocks @ [predlbl] @ pinstr @ [notpred] @ [bexit];
 
+        (* body node *)
+        let bodycomm = TAC_Comment("while-body") in
         let binstr, bexp = convert astbody.exp_kind var cname mname in 
+        let jpred = TAC_Jump(predlblname) in 
+        let prevNode : cfg_node = !currNode in
+        currNode := {
+          label = bodylbl;
+          comment = bodycomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+        };
+        !currNode.blocks <- !currNode.blocks @ binstr @ [jpred];
+        prevNode.false_branch <- Some(!currNode); (* link notpred = false to body node *)
+
+        (* exit node *)
+        let exitcomm = TAC_Comment("while-exit") in
+        let prevNode : cfg_node = !currNode in 
+        currNode := {
+          label = exitlbl;
+          comment = exitcomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+        };
+        prevNode.true_branch <- Some(!currNode);
 
         [predlbl] @ pinstr @ [notpred] @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
