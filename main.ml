@@ -26,8 +26,9 @@ type tac_instr =
   | TAC_Assign_ObjectAlloc of label * label (* might have to change to tac_expr *)
   | TAC_Assign_ObjectDefault of label * label
   | TAC_Assign_NullCheck of label * tac_expr
-  | TAC_Assign_FunctionCall of label * label * (tac_expr list) option
-  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list) option
+  | TAC_Assign_Dynamic_FunctionCall of label * label * (tac_expr list)
+  | TAC_Assign_Static_FunctionCall of label * label * label * (tac_expr list)
+  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list)
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
   | TAC_Remove_Let of label
@@ -499,7 +500,7 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
-        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, !args_vars) in
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | Self_Dispatch((_,mname), args) -> 
         let retTacInstr = ref [] in
@@ -509,10 +510,10 @@ let main() = (
           retTacInstr := List.append !retTacInstr i;
           args_vars := List.append !args_vars [ta]
         ) args;
-        let to_output = TAC_Assign_Self_FunctionCall(var, mname, cname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Self_FunctionCall(var, mname, cname, !args_vars) in
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ [to_output]), TAC_Variable(var)
-      | Static_Dispatch(caller, _, (_, mname), args) ->
+      | Static_Dispatch(caller, (_, stype), (_, mname), args) ->
         let retTacInstr = ref [] in
         let args_vars = ref [] in
         List.iter(fun a ->
@@ -521,7 +522,7 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
-        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Static_FunctionCall(var, mname, stype, !args_vars) in
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
@@ -633,50 +634,64 @@ let main() = (
         let predlbl = TAC_Label(predlblname) in
         let bodylblname = fresh_label cname mname in 
         let bodylbl = TAC_Label(bodylblname) in 
+        let predcomm = TAC_Comment(sprintf "Predicate for %s" bodylblname) in
         let exitlblname = fresh_label cname mname in 
         let exitlbl = TAC_Label(exitlblname) in
-
+        let jpred = TAC_Jump(predlblname) in 
+        !currNode.blocks <- !currNode.blocks @ [jpred];
+        let prevNode = !currNode in
         (* entry/predicate setup *)
-        let predcomm = TAC_Comment("while-pred") in
         let predvar = fresh_var() in 
         let notpredvar = fresh_var () in 
+        currNode := {
+          label = predlbl;
+          comment = predcomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+          parent_branches = [Some(prevNode)];
+        };
+        
         let pinstr, pexp = convert pred.exp_kind predvar cname mname in 
-        let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in 
+        (* let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in *) 
         let bexit = TAC_Branch_True(notpredvar, exitlblname) in 
-
+        !currNode.blocks <- !currNode.blocks @ [bexit];
+        let predNode = !currNode in
         (* append predicate to currNode *)
-        !currNode.blocks <- !currNode.blocks @ [predcomm] @ [predlbl] @ pinstr @ [notpred] @ [bexit];
-
+        (* !currNode.blocks <- !currNode.blocks @ [predlbl] @ pinstr @ [notpred] @ [bexit]; *)
+        prevNode.true_branch <- Some(predNode);
         (* body node *)
         let bodycomm = TAC_Comment("while-body") in
-        let binstr, bexp = convert astbody.exp_kind var cname mname in 
-        let jpred = TAC_Jump(predlblname) in 
-        let prevNode : cfg_node = !currNode in
         currNode := {
           label = bodylbl;
           comment = bodycomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
-          parent_branches = [Some(prevNode)];
+          parent_branches = [Some(predNode)];
         };
-        !currNode.blocks <- !currNode.blocks @ binstr @ [jpred];
-        prevNode.false_branch <- Some(!currNode); (* link notpred = false to body node *)
-
+        predNode.false_branch <- Some(!currNode);
+        let binstr, bexp = convert astbody.exp_kind var cname mname in 
+        (* let prevNode : cfg_node = !currNode in *)
+        !currNode.blocks <- !currNode.blocks @ [jpred];
+        (* prevNode.false_branch <- Some(!currNode); (* link notpred = false to body node *) *)
         (* exit node *)
-        let exitcomm = TAC_Comment("while-exit") in
-        let prevNode : cfg_node = !currNode in 
-        currNode := {
+        merge_node predNode.false_branch (Some(predNode));
+        let exitcomm = TAC_Comment(sprintf "while-exit for %s-%s" predlblname bodylblname) in
+        (* let prevNode : cfg_node = !currNode in  *)
+        let bodyNode = !currNode in
+        let joinNode = {
           label = exitlbl;
           comment = exitcomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
-          parent_branches = [Some(prevNode)];
-        };
-        prevNode.true_branch <- Some(!currNode);
-
-        [predlbl] @ pinstr @ [notpred] @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
+          parent_branches = [Some(predNode); Some(bodyNode)];
+        } in
+        predNode.true_branch <- Some(joinNode);
+        bodyNode.false_branch <- Some(joinNode);
+        currNode := joinNode;
+        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -724,7 +739,7 @@ let main() = (
       let res = max (numTemps pred.exp_kind) (numTemps astthen.exp_kind) in
       max res (numTemps astelse.exp_kind)
     | While (pred, astbody) ->
-      max (numTemps pred.exp_kind) (numTemps astbody.exp_kind)
+      max (numTemps pred.exp_kind ) (numTemps astbody.exp_kind)
     | _ -> 0
   )
   in
@@ -1013,11 +1028,12 @@ let main() = (
       (* if class tag is Int, String, Bool -> return Bool(false) *)
       (* if class tag is something else, check if not initialized *)
       (* return Bool(true) if not initialized, Bool(false) otherwise *)
-    | TAC_Assign_FunctionCall(var, mname, None) ->
-      fprintf fout "%s <- call %s\n" var mname;
-    | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
+    | TAC_Assign_Static_FunctionCall(var, mname, stype, args_vars) ->
+      fprintf fout " %s <- call %s\n" var mname;
+    | TAC_Assign_Dynamic_FunctionCall(var, mname, args_vars) ->
+      (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
-    | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
+    | TAC_Assign_Self_FunctionCall(var, mname, cname, args_vars) ->
       (* if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 16; funRetFlag := "";); *)
       funRetFlag := "";
       fprintf fout "\n\t## %s(...)\n" mname;
@@ -1051,7 +1067,11 @@ let main() = (
     | TAC_Assign_New(var, name) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "%s <- new %s\n" var name
+      fprintf fout "\n\t## new object\n";
+      call_new fout name;
+      (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
+      stackOffset := !stackOffset -16;
     | TAC_Assign_Default(var, name) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
