@@ -738,6 +738,7 @@ let main() = (
     fprintf fout "\tpopq %%rbp\n";
   )
   in
+  let stringCounter = (ref 0) in 
   (* convert TAC instructions into asm *)
   let funRetFlag = ref "" in
   let tac_to_asm fout stackOffset tac_instruction = (
@@ -777,8 +778,13 @@ let main() = (
     | TAC_Assign_String(var, i) ->
       (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
       funRetFlag := ""; *)
-      fprintf fout "\n\t## String Constant %s\n" i;
-      Hashtbl.add asm_strings i ("string"^i);
+      fprintf fout "\n\t## string provided %s\n" i;
+      Hashtbl.add asm_strings i ("string" ^ string_of_int(!stringCounter));
+      call_new fout "String";
+      fprintf fout "\tmovq $%s, 24(%%r13)\n" ("string" ^ string_of_int(!stringCounter));
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
+      stackOffset := !stackOffset - 16;
+      stringCounter := !stringCounter + 1;
     | TAC_Assign_Plus(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
@@ -1158,9 +1164,10 @@ in
     (* output vtables from impl_map *)
     List.iteri (fun i (cname, methods) -> (
       fprintf aout ".globl %s..vtable\n%s..vtable:\n" cname cname;
-      fprintf aout "\t.quad string%d\n" i; (* name *)
+      fprintf aout "\t.quad string%d\n" !stringCounter; (* name *)
       (* add class name as a string under the label stringn *)
-      Hashtbl.add asm_strings cname ("string"^(string_of_int i));
+      Hashtbl.add asm_strings cname ("string" ^ string_of_int(!stringCounter));
+      stringCounter := !stringCounter + 1;
       fprintf aout "\t.quad %s..new\n" cname; (* constructor *)
       List.iteri (fun i (mname, _, defclass, _) -> (
         Hashtbl.add vtable (cname, mname) ((i+2) * 8);
