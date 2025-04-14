@@ -388,14 +388,13 @@ let main() = (
     match a with
       | Identifier(v) -> 
         let _, name = v in
-        (* printf "%s\n" name; *)
+        printf "looking up %s\n" name;
         (match Hashtbl.find_opt ident_tac name with 
         | Some(ta) -> 
-          (* printf "found -> returning %s\n" (tac_expr_to_name ta); *)
+          printf "found <%s:%s>, returning\n" name (tac_expr_to_name ta);
           !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, (tac_expr_to_name ta))];
           [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
         | None -> 
-          (* printf "created %s \n" name; *)
           Hashtbl.add ident_tac name (TAC_Variable(var));
           !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, name)];
           [TAC_Assign_Identifier(var, name)], TAC_Variable(var))
@@ -530,19 +529,17 @@ let main() = (
         let retTacInstr = ref [] in
         let let_vars = ref [] in
         let removeScope = ref [] in
-        List.iter
-            (fun (Binding ((_, vname), (_, typename), binit)) ->
+        List.iteri
+            (fun iter (Binding ((vloc, vname), (_, typename), binit)) ->
               match binit with
               (* [Let-Init] *)
               | Some binit ->
                 let var = fresh_var () in
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 let i, ta = convert binit.exp_kind (var) cname mname in
-                retTacInstr := List.append !retTacInstr i;
-                !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Assign(var, ta)];
+                retTacInstr := List.append !retTacInstr [TAC_Assign_Assign(var, ta)];
                 let_vars := List.append !let_vars [ta];
                 removeScope := List.append !removeScope [TAC_Remove_Let(var)];
-                (* Hashtbl.add ident_tac vname (ta) *)
               (* [Let-No-Init] *)
               | None -> 
                 let var = fresh_var () in
@@ -551,7 +548,6 @@ let main() = (
                 !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Default(var, typename)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
                 removeScope := List.append !removeScope [TAC_Remove_Let(var)];
-                (* Hashtbl.add ident_tac vname (TAC_Variable(var)) *)
               )
             bindlist;
         let i, ta = convert let_body.exp_kind var cname mname in

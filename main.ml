@@ -542,8 +542,7 @@ let main() = (
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 let i, ta = convert binit.exp_kind (var) cname mname in
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Assign(var, ta)];
-                !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Assign(var, ta)];
-                let_vars := List.append !let_vars [TAC_Variable(var)];
+                let_vars := List.append !let_vars [ta];
                 removeScope := List.append !removeScope [TAC_Remove_Let(var)];
               (* [Let-No-Init] *)
               | None -> 
@@ -765,7 +764,12 @@ let main() = (
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16);
       funRetFlag := "";
       fprintf fout "\n\t## identifier\n";
-      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
+      if Hashtbl.mem envtable i then (
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
+      ) else ( (* move top of stack *)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 16) (* TODO: broken *)
+      );
+      
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
       fprintf fout "";
@@ -1088,15 +1092,16 @@ let main() = (
       fprintf fout "\n\n## TAC_Assign_Assign\n";
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "\n\t## update identifier\n";
+      fprintf fout "\n\t## update identifier %s\n" var;
       if not(Hashtbl.mem envtable (tac_expr_to_name i)) then (
-        (* stackOffset := !stackOffset + 16; *)
-        fprintf fout "\t## fp[%d] holds local %s\n" (!stackOffset + 16) var;
-        Hashtbl.add envtable (tac_expr_to_name i) (!stackOffset + 16);
+        stackOffset := !stackOffset + 16; (* pop top of stack *)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
+      ) else (
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
       );
-      
-      fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
-      fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
+      if Hashtbl.mem envtable var then (
+        fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
+      );
     | TAC_Branch_True(cond, label) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";); 
       funRetFlag := "";
