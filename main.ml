@@ -1088,9 +1088,8 @@ let main() = (
       funRetFlag := "";
       fprintf fout "\n\t## update identifier\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i)) then (
-        Hashtbl.add envtable (tac_expr_to_name i) !stackOffset; (* this is broken *)
-        stackOffset := !stackOffset +16;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
+        Hashtbl.add envtable (tac_expr_to_name i) (!stackOffset + 16); (* this is broken *)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 16);
       ) else (
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
       );
