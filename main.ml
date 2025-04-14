@@ -530,18 +530,18 @@ let main() = (
         let retTacInstr = ref [] in
         let let_vars = ref [] in
         let removeScope = ref [] in
-        List.iter
-            (fun (Binding ((_, vname), (_, typename), binit)) ->
+        List.iteri
+            (fun iter (Binding ((vloc, vname), (_, typename), binit)) ->
               match binit with
               (* [Let-Init] *)
               | Some binit ->
                 let var = fresh_var () in
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 let i, ta = convert binit.exp_kind (var) cname mname in
-                retTacInstr := List.append !retTacInstr i;
-                let_vars := List.append !let_vars [ta];
+                retTacInstr := List.append !retTacInstr [TAC_Assign_Assign(var, ta)];
+                !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Assign(var, ta)];
+                let_vars := List.append !let_vars [TAC_Variable(var)];
                 removeScope := List.append !removeScope [TAC_Remove_Let(var)];
-                (* Hashtbl.add ident_tac vname (ta) *)
               (* [Let-No-Init] *)
               | None -> 
                 let var = fresh_var () in
@@ -550,14 +550,13 @@ let main() = (
                 !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Default(var, typename)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
                 removeScope := List.append !removeScope [TAC_Remove_Let(var)];
-                (* Hashtbl.add ident_tac vname (TAC_Variable(var)) *)
               )
             bindlist;
         let i, ta = convert let_body.exp_kind var cname mname in
         List.iter
             (fun (Binding ((_, vname), (_, _), _)) ->
               Hashtbl.remove ident_tac vname;
-              )
+            )
             bindlist;
         !currNode.blocks <- !currNode.blocks @ !removeScope;
         (!retTacInstr @ i @ !removeScope), TAC_Variable(var)
@@ -1072,10 +1071,12 @@ let main() = (
       stackOffset := !stackOffset -16;
     | TAC_Assign_Assign(var, i) ->
       (* printf "Searching for var %s\n" var; *)
+      fprintf fout "\n\n## TAC_Assign_Assign\n";
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
       fprintf fout "\n\t## update identifier\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i)) then (
+        Hashtbl.add envtable (tac_expr_to_name i) !stackOffset; (* this is broken *)
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
       ) else (
@@ -1215,8 +1216,17 @@ in
       | "Object" | "IO" -> 
         fprintf aout "";
       | _ -> (
-        List.iteri (fun i (aname, atype, _) -> (
+        List.iteri (fun i (aname, atype, aexp) -> (
           (* TODO: Impl Later *)
+          match aexp with 
+          | Some(aexp) -> (
+            (* parse expression *)
+            fprintf aout "## %s: %s\n" cname aname;
+          )
+          | None -> (
+            (* default initialization *)
+            fprintf aout "## %s: %s\n" cname aname;
+          )
         )) attrs;
       ));
       fprintf aout "\tmovq %%r12, %%r13\n";
@@ -1243,8 +1253,9 @@ in
         fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
         fprintf aout "\tmovq 16(%%rbp), %%r12\n";
 
-        (* allocate formals onto stack *)
-        (* let nformals = List.length(formals) in  *)
+        (* add hashtbl offset entries for each formal, relative to %rbp *)
+
+
         let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
         fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
         fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
