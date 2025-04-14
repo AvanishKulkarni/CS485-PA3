@@ -26,8 +26,9 @@ type tac_instr =
   | TAC_Assign_ObjectAlloc of label * label (* might have to change to tac_expr *)
   | TAC_Assign_ObjectDefault of label * label
   | TAC_Assign_NullCheck of label * tac_expr
-  | TAC_Assign_FunctionCall of label * label * (tac_expr list) option
-  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list) option
+  | TAC_Assign_Dynamic_FunctionCall of label * label * (tac_expr list)
+  | TAC_Assign_Static_FunctionCall of label * label * label * (tac_expr list)
+  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list)
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
   | TAC_Remove_Let of label
@@ -499,7 +500,7 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
-        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, !args_vars) in
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | Self_Dispatch((_,mname), args) -> 
         let retTacInstr = ref [] in
@@ -509,10 +510,10 @@ let main() = (
           retTacInstr := List.append !retTacInstr i;
           args_vars := List.append !args_vars [ta]
         ) args;
-        let to_output = TAC_Assign_Self_FunctionCall(var, mname, cname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Self_FunctionCall(var, mname, cname, !args_vars) in
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ [to_output]), TAC_Variable(var)
-      | Static_Dispatch(caller, _, (_, mname), args) ->
+      | Static_Dispatch(caller, (_, stype), (_, mname), args) ->
         let retTacInstr = ref [] in
         let args_vars = ref [] in
         List.iter(fun a ->
@@ -521,7 +522,7 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
-        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Static_FunctionCall(var, mname, stype, !args_vars) in
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
@@ -738,7 +739,7 @@ let main() = (
       let res = max (numTemps pred.exp_kind) (numTemps astthen.exp_kind) in
       max res (numTemps astelse.exp_kind)
     | While (pred, astbody) ->
-      1+max (numTemps pred.exp_kind ) (numTemps astbody.exp_kind) (*conservate estimate, 1+ is for the not of the predicate*)
+      max (numTemps pred.exp_kind ) (numTemps astbody.exp_kind)
     | _ -> 0
   )
   in
@@ -1021,11 +1022,12 @@ let main() = (
       (* if class tag is Int, String, Bool -> return Bool(false) *)
       (* if class tag is something else, check if not initialized *)
       (* return Bool(true) if not initialized, Bool(false) otherwise *)
-    | TAC_Assign_FunctionCall(var, mname, None) ->
-      fprintf fout "%s <- call %s\n" var mname;
-    | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
+    | TAC_Assign_Static_FunctionCall(var, mname, stype, args_vars) ->
+      fprintf fout " %s <- call %s\n" var mname;
+    | TAC_Assign_Dynamic_FunctionCall(var, mname, args_vars) ->
+      (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
       fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
-    | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
+    | TAC_Assign_Self_FunctionCall(var, mname, cname, args_vars) ->
       (* if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 16; funRetFlag := "";); *)
       funRetFlag := "";
       fprintf fout "\n\t## %s(...)\n" mname;
@@ -1059,7 +1061,11 @@ let main() = (
     | TAC_Assign_New(var, name) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "%s <- new %s\n" var name
+      fprintf fout "\n\t## new object\n";
+      call_new fout name;
+      (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
+      stackOffset := !stackOffset -16;
     | TAC_Assign_Default(var, name) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";

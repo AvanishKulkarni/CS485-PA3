@@ -539,6 +539,7 @@ let main() = (
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 let i, ta = convert binit.exp_kind (var) cname mname in
                 retTacInstr := List.append !retTacInstr i;
+                !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Assign(var, ta)];
                 let_vars := List.append !let_vars [ta];
                 removeScope := List.append !removeScope [TAC_Remove_Let(var)];
                 (* Hashtbl.add ident_tac vname (ta) *)
