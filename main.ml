@@ -764,11 +764,22 @@ let main() = (
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16);
       funRetFlag := "";
       fprintf fout "\n\t## identifier\n";
-      if Hashtbl.mem envtable i then (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
+      if not (Hashtbl.mem envtable i) then (
+        stackOffset := !stackOffset + 16;
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset) (* TODO: broken *)
       ) else ( (* move top of stack *)
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 16) (* TODO: broken *)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
       );
+
+      (* 
+      if not(Hashtbl.mem envtable (tac_expr_to_name i2)) then (
+        stackOffset := !stackOffset +16;
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
+      ) else (
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
+      );
+      
+      *)
       
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
