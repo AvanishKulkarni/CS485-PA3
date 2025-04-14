@@ -634,50 +634,64 @@ let main() = (
         let predlbl = TAC_Label(predlblname) in
         let bodylblname = fresh_label cname mname in 
         let bodylbl = TAC_Label(bodylblname) in 
+        let predcomm = TAC_Comment(sprintf "Predicate for %s" bodylblname) in
         let exitlblname = fresh_label cname mname in 
         let exitlbl = TAC_Label(exitlblname) in
-
+        let jpred = TAC_Jump(predlblname) in 
+        !currNode.blocks <- !currNode.blocks @ [jpred];
+        let prevNode = !currNode in
         (* entry/predicate setup *)
-        let predcomm = TAC_Comment("while-pred") in
         let predvar = fresh_var() in 
         let notpredvar = fresh_var () in 
+        currNode := {
+          label = predlbl;
+          comment = predcomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+          parent_branches = [Some(prevNode)];
+        };
+        
         let pinstr, pexp = convert pred.exp_kind predvar cname mname in 
-        let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in 
+        (* let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in *) 
         let bexit = TAC_Branch_True(notpredvar, exitlblname) in 
-
+        !currNode.blocks <- !currNode.blocks @ [bexit];
+        let predNode = !currNode in
         (* append predicate to currNode *)
-        !currNode.blocks <- !currNode.blocks @ [predcomm] @ [predlbl] @ pinstr @ [notpred] @ [bexit];
-
+        (* !currNode.blocks <- !currNode.blocks @ [predlbl] @ pinstr @ [notpred] @ [bexit]; *)
+        prevNode.true_branch <- Some(predNode);
         (* body node *)
         let bodycomm = TAC_Comment("while-body") in
-        let binstr, bexp = convert astbody.exp_kind var cname mname in 
-        let jpred = TAC_Jump(predlblname) in 
-        let prevNode : cfg_node = !currNode in
         currNode := {
           label = bodylbl;
           comment = bodycomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
-          parent_branches = [Some(prevNode)];
+          parent_branches = [Some(predNode)];
         };
-        !currNode.blocks <- !currNode.blocks @ binstr @ [jpred];
-        prevNode.false_branch <- Some(!currNode); (* link notpred = false to body node *)
-
+        predNode.false_branch <- Some(!currNode);
+        let binstr, bexp = convert astbody.exp_kind var cname mname in 
+        (* let prevNode : cfg_node = !currNode in *)
+        !currNode.blocks <- !currNode.blocks @ [jpred];
+        (* prevNode.false_branch <- Some(!currNode); (* link notpred = false to body node *) *)
         (* exit node *)
-        let exitcomm = TAC_Comment("while-exit") in
-        let prevNode : cfg_node = !currNode in 
-        currNode := {
+        merge_node predNode.false_branch (Some(predNode));
+        let exitcomm = TAC_Comment(sprintf "while-exit for %s-%s" predlblname bodylblname) in
+        (* let prevNode : cfg_node = !currNode in  *)
+        let bodyNode = !currNode in
+        let joinNode = {
           label = exitlbl;
           comment = exitcomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
-          parent_branches = [Some(prevNode)];
-        };
-        prevNode.true_branch <- Some(!currNode);
-
-        [predlbl] @ pinstr @ [notpred] @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
+          parent_branches = [Some(predNode); Some(bodyNode)];
+        } in
+        predNode.true_branch <- Some(joinNode);
+        bodyNode.false_branch <- Some(joinNode);
+        currNode := joinNode;
+        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -725,7 +739,7 @@ let main() = (
       let res = max (numTemps pred.exp_kind) (numTemps astthen.exp_kind) in
       max res (numTemps astelse.exp_kind)
     | While (pred, astbody) ->
-      max (numTemps pred.exp_kind) (numTemps astbody.exp_kind)
+      1+max (numTemps pred.exp_kind ) (numTemps astbody.exp_kind) (*conservate estimate, 1+ is for the not of the predicate*)
     | _ -> 0
   )
   in

@@ -1,4 +1,4 @@
-(* Allen Cabrera, Avanish Kulkarni - PA3C2 *)
+(* Allen Cabrera, Avanish Kulkarni - PA3 *)
 
 open Printf
 
@@ -27,9 +27,10 @@ type tac_instr =
   | TAC_Assign_ObjectDefault of label * label
   | TAC_Assign_NullCheck of label * tac_expr
   | TAC_Assign_FunctionCall of label * label * (tac_expr list) option
+  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list) option
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
-  | TAC_Assign_Let of label * tac_expr list
+  | TAC_Remove_Let of label
   | TAC_Assign_Assign of label * tac_expr
   | TAC_Branch_True of bconst * label
   | TAC_Comment of string
@@ -49,7 +50,9 @@ and cfg_node = {
   mutable blocks: tac_instr list;
   mutable true_branch: cfg_node option;
   mutable false_branch: cfg_node option;
+  mutable parent_branches: cfg_node option list;
 }
+
 let tac_expr_to_name t = match t with TAC_Variable c -> c
 
 type static_type =
@@ -110,7 +113,12 @@ and case_elem = Case_Elem of id * cool_type * exp
 let varCount = ref 0;;
 let labelCount = ref 1;;
 
+let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
+let envtable : (string, int) Hashtbl.t = Hashtbl.create 255
+let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 
+
 let main() = (
+  Printexc.record_backtrace true;
   let fname = Sys.argv.(1) in 
   let fin = open_in fname in 
   let rec range k = if k <= 0 then [] else k :: range (k - 1) in
@@ -142,10 +150,6 @@ let main() = (
     | _ -> failwith "attr read failed in read_class_map"
   in (aname, atype, aexp)
   )
-  (* TODO: implement reading output expressions from PA2 *)
-(*   and read_exp () = (
-
-  ) *)
   and read_impl_map () = (
     let _ = read () in (* read "implementation_map" *)
     let classes = read_list read_class_imp_map
@@ -361,24 +365,25 @@ let main() = (
       (sprintf "%s_%s_%d" cname mname !labelCount) in labelCount := !labelCount + 1;
       newLabel
   ) in
-  let ident_tac : (name, (tac_expr)) Hashtbl.t = Hashtbl.create 255 in
   let currNode : cfg_node ref = ref {
     label = TAC_Label("");
     comment = TAC_Comment("");
     blocks = [];
     true_branch = None;
     false_branch = None;
+    parent_branches = [];
   } in
-  let rec merge_node curr_node = (
+  let rec merge_node curr_node join_node = (
     match curr_node with
     | Some(curr_node) -> (
       match curr_node.true_branch with
-      | None -> curr_node.true_branch <- Some(!currNode);
-      | Some(node_branch) -> merge_node (Some(node_branch));
+      | None -> curr_node.true_branch <- join_node;
+      | Some(node_branch) -> merge_node (Some(node_branch)) join_node;
     )
     | None -> ();
   )
     in
+  let ident_tac : (name, (tac_expr)) Hashtbl.t = Hashtbl.create 255 in
   let rec convert (a: exp_kind) (var : name) (cname: name) (mname: name) : (tac_instr list * tac_expr) = (
     match a with
       | Identifier(v) -> 
@@ -504,7 +509,7 @@ let main() = (
           retTacInstr := List.append !retTacInstr i;
           args_vars := List.append !args_vars [ta]
         ) args;
-        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Self_FunctionCall(var, mname, cname, Some(!args_vars)) in
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ [to_output]), TAC_Variable(var)
       | Static_Dispatch(caller, _, (_, mname), args) ->
@@ -524,6 +529,7 @@ let main() = (
       | Let(bindlist, let_body) ->
         let retTacInstr = ref [] in
         let let_vars = ref [] in
+        let removeScope = ref [] in
         List.iter
             (fun (Binding ((_, vname), (_, typename), binit)) ->
               match binit with
@@ -534,6 +540,7 @@ let main() = (
                 let i, ta = convert binit.exp_kind (var) cname mname in
                 retTacInstr := List.append !retTacInstr i;
                 let_vars := List.append !let_vars [ta];
+                removeScope := List.append !removeScope [TAC_Remove_Let(var)];
                 (* Hashtbl.add ident_tac vname (ta) *)
               (* [Let-No-Init] *)
               | None -> 
@@ -542,6 +549,7 @@ let main() = (
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Default(var, typename)];
                 !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Default(var, typename)];
                 let_vars := List.append !let_vars [TAC_Variable(var)];
+                removeScope := List.append !removeScope [TAC_Remove_Let(var)];
                 (* Hashtbl.add ident_tac vname (TAC_Variable(var)) *)
               )
             bindlist;
@@ -551,7 +559,8 @@ let main() = (
               Hashtbl.remove ident_tac vname;
               )
             bindlist;
-        (!retTacInstr @ i), TAC_Variable(var)
+        !currNode.blocks <- !currNode.blocks @ !removeScope;
+        (!retTacInstr @ i @ !removeScope), TAC_Variable(var)
       | Assign((_, name), exp) ->
         let tac_var = Hashtbl.find ident_tac name in
         (* Hashtbl.add ident_tac name (TAC_Variable(var)); *)
@@ -561,6 +570,7 @@ let main() = (
         let to_output = TAC_Assign_Assign((tac_expr_to_name tac_var), ta) in
         !currNode.blocks <- !currNode.blocks @ [to_output] @ [new_id];
         (i @ [to_output] @ [new_id]), (TAC_Variable(new_var))
+      (* Need to finish rest of tac for objects and conditionals*)
       | If (pred, astthen, astelse) -> 
         let thenvar = fresh_var () in 
         let thenlbl = fresh_label cname mname in 
@@ -580,13 +590,14 @@ let main() = (
         let jjmp = TAC_Jump(joinlbl) in 
         !currNode.blocks <- !currNode.blocks @ [be];
         let prevNode : cfg_node = !currNode in
-        (* true node *)
+        (* true node*)
         currNode := {
           label = tlbl;
           comment = tcomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
+          parent_branches = [Some(prevNode)];
         };
         prevNode.true_branch <- Some(!currNode);
         let tinstr, texp = convert astthen.exp_kind (var) cname mname in 
@@ -598,6 +609,7 @@ let main() = (
           blocks = [];
           true_branch = None;
           false_branch = None;
+          parent_branches = [Some(prevNode)];
         };
         prevNode.false_branch <- Some(!currNode);
         let einstr, eexp = convert astelse.exp_kind (var) cname mname in 
@@ -608,10 +620,12 @@ let main() = (
           blocks = [];
           true_branch = None;
           false_branch = None;
+          parent_branches = [prevNode.true_branch] @ [prevNode.false_branch];
         }
         in
         (* merge node *)
-       
+        merge_node (prevNode.true_branch) (Some(joinNode));
+        merge_node (prevNode.false_branch) (Some(joinNode));
         currNode := joinNode;
         pinstr @ [be] @ [tcomm] @ [tlbl] @ tinstr @ [jjmp] @ [ecomm] @ [elbl] @ einstr @ [jjmp] @ [jcomm] @ [jlbl], TAC_Variable(var)
       | While (pred, astbody) ->
@@ -620,46 +634,63 @@ let main() = (
         let predlbl = TAC_Label(predlblname) in
         let bodylblname = fresh_label cname mname in 
         let bodylbl = TAC_Label(bodylblname) in 
+        let predcomm = TAC_Comment(sprintf "Predicate for %s" bodylblname) in
         let exitlblname = fresh_label cname mname in 
         let exitlbl = TAC_Label(exitlblname) in
-
+        let jpred = TAC_Jump(predlblname) in 
+        !currNode.blocks <- !currNode.blocks @ [jpred];
+        let prevNode = !currNode in
         (* entry/predicate setup *)
         let predvar = fresh_var() in 
         let notpredvar = fresh_var () in 
+        currNode := {
+          label = predlbl;
+          comment = predcomm;
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+          parent_branches = [Some(prevNode)];
+        };
+        
         let pinstr, pexp = convert pred.exp_kind predvar cname mname in 
         let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in 
         let bexit = TAC_Branch_True(notpredvar, exitlblname) in 
-
+        !currNode.blocks <- !currNode.blocks @ [bexit];
+        let predNode = !currNode in
         (* append predicate to currNode *)
-        !currNode.blocks <- !currNode.blocks @ [predlbl] @ pinstr @ [notpred] @ [bexit];
-
+        (* !currNode.blocks <- !currNode.blocks @ [predlbl] @ pinstr @ [notpred] @ [bexit]; *)
+        prevNode.true_branch <- Some(predNode);
         (* body node *)
         let bodycomm = TAC_Comment("while-body") in
-        let binstr, bexp = convert astbody.exp_kind var cname mname in 
-        let jpred = TAC_Jump(predlblname) in 
-        let prevNode : cfg_node = !currNode in
         currNode := {
           label = bodylbl;
           comment = bodycomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
+          parent_branches = [Some(predNode)];
         };
-        !currNode.blocks <- !currNode.blocks @ binstr @ [jpred];
-        prevNode.false_branch <- Some(!currNode); (* link notpred = false to body node *)
-
+        predNode.false_branch <- Some(!currNode);
+        let binstr, bexp = convert astbody.exp_kind var cname mname in 
+        (* let prevNode : cfg_node = !currNode in *)
+        !currNode.blocks <- !currNode.blocks @ [jpred];
+        (* prevNode.false_branch <- Some(!currNode); (* link notpred = false to body node *) *)
         (* exit node *)
-        let exitcomm = TAC_Comment("while-exit") in
-        let prevNode : cfg_node = !currNode in 
-        currNode := {
+        merge_node predNode.false_branch (Some(predNode));
+        let exitcomm = TAC_Comment(sprintf "while-exit for %s-%s" predlblname bodylblname) in
+        (* let prevNode : cfg_node = !currNode in  *)
+        let bodyNode = !currNode in
+        let joinNode = {
           label = exitlbl;
           comment = exitcomm;
           blocks = [];
           true_branch = None;
           false_branch = None;
-        };
-        prevNode.true_branch <- Some(!currNode);
-
+          parent_branches = [Some(predNode); Some(bodyNode)];
+        } in
+        predNode.true_branch <- Some(joinNode);
+        bodyNode.false_branch <- Some(joinNode);
+        currNode := joinNode;
         [predlbl] @ pinstr @ [notpred] @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
@@ -700,6 +731,10 @@ let main() = (
         fprintf fout "%s <- call %s" var mname;
         List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
         fprintf fout "\n";
+      | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
+        fprintf fout "%s <- call %s" var mname;
+        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+        fprintf fout "\n";
       | TAC_Assign_New(var, name) ->
         fprintf fout "%s <- new %s\n" var name
       | TAC_Assign_Default(var, name) ->
@@ -726,15 +761,22 @@ let main() = (
     match cfgNode with
     | None -> ();
     | Some(cfgNode) -> 
-      if not(List.mem cfgNode.label !visitedNodes) then (
+      if (not(List.mem cfgNode.label !visitedNodes) && 
+        (List.for_all (fun x -> match x with Some(x) -> List.mem x.label !visitedNodes; | None -> true) cfgNode.parent_branches)) then (
+        (* printf "In cfg %s\n" (match cfgNode.label with | TAC_Label(label) -> label | _ -> "");
+        printf "StackOffset Before Blocks: %d\n" !stackOffset; *)
         visitedNodes :=  cfgNode.label :: !visitedNodes;
         output_tac_helper fout cfgNode.comment;
         output_tac_helper fout cfgNode.label;
         List.iter ( fun x ->
           output_tac_helper fout x;
         ) cfgNode.blocks;
+        (* printf "StackOffset After Blocks: %d\n" !stackOffset; *)
         output_tac fout cfgNode.true_branch;
+        (* stackOffset := !trueOffset; *)
         output_tac fout cfgNode.false_branch;
+        
+        
       )
   )
   in
@@ -764,6 +806,7 @@ let main() = (
         blocks = [];
         true_branch = None;
         false_branch = None;
+        parent_branches = [];
       }
       in
       currNode := node;
