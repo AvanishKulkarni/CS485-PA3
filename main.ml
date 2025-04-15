@@ -115,7 +115,8 @@ and case_elem = Case_Elem of id * cool_type * exp
 let varCount = ref 0;;
 let labelCount = ref 1;;
 
-let letOffset = ref 0;;
+let stringCounter = ref 0;;
+let divCounter = ref 0;;
 
 let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
 let envtable : (string, int) Hashtbl.t = Hashtbl.create 255
@@ -443,6 +444,8 @@ let main() = (
         let i2, ta2 = convert a2.exp_kind arg2 cname mname in
         let to_output = TAC_Assign_Div(var, ta1, ta2) in
         !currNode.blocks <- !currNode.blocks @ [to_output];
+        Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(a1.loc) ^ ": Exception: division by zero\\n") ("divErrString" ^ string_of_int(!divCounter));
+        divCounter := !divCounter + 1;
         (i1 @ i2 @ [to_output]), (TAC_Variable(var))
       | Lt(a1, a2) ->
         let arg1 = fresh_var () in
@@ -761,7 +764,10 @@ let main() = (
     fprintf fout "\tpopq %%rbp\n";
   )
   in
-  let stringCounter = (ref 0) in 
+
+  (* reset divCounter *)
+  let divCounter = (ref 0) in 
+
   (* convert TAC instructions into asm *)
   let funRetFlag = ref "" in
   let tac_to_asm fout stackOffset tac_instruction = (
@@ -918,8 +924,22 @@ let main() = (
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovl 24(%%r15), %%eax\n";
-      fprintf fout "\tmovq $0, %%rdx\n";
+      fprintf fout "\txorq %%rdx, %%rdx\n";
       fprintf fout "\tcltd\n";
+
+      (* division by zero check *)
+      fprintf fout "\tcmpl $0, %%r14d\n";
+      fprintf fout "\tjne div_good_%d\n" !divCounter;
+
+      (* use cooloutstr to error out *)
+      fprintf fout "\tmovq $%s, %%rdi\n" ("divErrString" ^ string_of_int(!divCounter));
+      fprintf fout "\tandq $-16, %%rsp\n";
+      fprintf fout "\tcall cooloutstr\n";
+      fprintf fout "\tandq $-16, %%rsp\n";
+      fprintf fout "\tmovl $1, %%edi\n";
+      fprintf fout "\tcall exit\n";
+
+      fprintf fout ".globl div_good_%d\ndiv_good_%d:\n" !divCounter !divCounter;
       fprintf fout "\tidivl %%r14d\n";
       fprintf fout "\tpushq %%rax\n";
       call_new fout "Int";
@@ -927,6 +947,7 @@ let main() = (
       fprintf fout "\tmovl %%eax, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
       stackOffset := !stackOffset -16;
+      divCounter := !divCounter + 1;
     | TAC_Assign_Lt(var, i1, i2) ->
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i1) && !funRetFlag <> (tac_expr_to_name i2) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
@@ -1506,16 +1527,13 @@ in
         )
         | "IO", "out_string" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tmovq $16, %%r14\n";
-          fprintf aout "\tsubq %%r14, %%rsp\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tmovq 24(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r13\n";
-          fprintf aout "\t## guarantee 16-byte alignment before call\n";
-          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tmovq %%r13, %%rdi\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall cooloutstr\n";
           fprintf aout "\tmovq %%r12, %%r13\n";
-          fprintf aout "\tret\n";
         )
         | "Object", "abort" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
@@ -1642,16 +1660,9 @@ in
 
     (* cooloutstr - copied from ref compiler *)
     fprintf aout ".globl cooloutstr\n";
-    fprintf aout ".type cooloutstr, @function\n";
     fprintf aout "cooloutstr:\n";
-    fprintf aout ".LFB6:\n";
-    fprintf aout "\t.cfi_startproc\n";
-    fprintf aout "\tendbr64\n";
     fprintf aout "\tpushq	%%rbp\n";
-    fprintf aout "\t.cfi_def_cfa_offset 16\n";
-    fprintf aout "\t.cfi_offset 6, -16\n";
     fprintf aout "\tmovq	%%rsp, %%rbp\n";
-    fprintf aout "\t.cfi_def_cfa_register 6\n";
     fprintf aout "\tsubq	$32, %%rsp\n";
     fprintf aout "\tmovq	%%rdi, -24(%%rbp)\n";
     fprintf aout "\tmovl	$0, -4(%%rbp)\n";
@@ -1725,9 +1736,7 @@ in
     fprintf aout "\tcall	fflush@PLT\n";
     fprintf aout "\tnop\n";
     fprintf aout "\tleave\n";
-    fprintf aout "\t.cfi_def_cfa 7, 8\n";
     fprintf aout "\tret\n";
-    fprintf aout "\t.cfi_endproc\n";
     fprintf aout ".LFE6:\n";
     fprintf aout "\t.size	cooloutstr, .-cooloutstr\n";
 
