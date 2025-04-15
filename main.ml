@@ -26,7 +26,7 @@ type tac_instr =
   | TAC_Assign_ObjectAlloc of label * label (* might have to change to tac_expr *)
   | TAC_Assign_ObjectDefault of label * label
   | TAC_Assign_NullCheck of label * tac_expr
-  | TAC_Assign_Dynamic_FunctionCall of label * label * (tac_expr list)
+  | TAC_Assign_Dynamic_FunctionCall of label * label * label * (tac_expr list)
   | TAC_Assign_Static_FunctionCall of label * label * label * (tac_expr list)
   | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list)
   | TAC_Assign_New of label * label
@@ -59,6 +59,7 @@ let tac_expr_to_name t = match t with TAC_Variable c -> c
 type static_type =
   | Class of string (* ex "Int" or "Object" *)
   | SELF_TYPE of string
+let type_to_str_clean t = match t with Class c | SELF_TYPE c -> c
 
 type cool_program = cool_class list
 and loc = int
@@ -502,7 +503,12 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
-        let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, !args_vars) in
+        let callerType = match caller.static_type with
+        | Some(stype) -> type_to_str_clean stype;
+        | None -> "";
+        in
+        let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, callerType, !args_vars) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | Self_Dispatch((_,mname), args) -> 
         let retTacInstr = ref [] in
@@ -525,6 +531,7 @@ let main() = (
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
         let to_output = TAC_Assign_Static_FunctionCall(var, mname, stype, !args_vars) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
@@ -1045,15 +1052,72 @@ let main() = (
       (* if class tag is Int, String, Bool -> return Bool(false) *)
       (* if class tag is something else, check if not initialized *)
       (* return Bool(true) if not initialized, Bool(false) otherwise *)
-    | TAC_Assign_Static_FunctionCall(var, mname, stype, args_vars) ->
-      fprintf fout " %s <- call %s\n" var mname;
-    | TAC_Assign_Dynamic_FunctionCall(var, mname, args_vars) ->
+    | TAC_Assign_Static_FunctionCall(var, mname, cname, args_vars) ->
+            (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
+      (* TODO: Add a VOID check for var, if caller is void then do a runtime error*)
+      fprintf fout "\n\t## %s(...) - Static Dispatch\n" mname;
+      fprintf fout "\tpushq %%r12\n";
+      fprintf fout "\tpushq %%rbp\n";
+      stackOffset := !stackOffset + 16; (* caller object is on top of the stack*)
+      fprintf fout "\tmovq %d(%%rbp), %%r12\n" (!stackOffset);
+      List.iteri (fun i var -> 
+        let var = (tac_expr_to_name var) in
+        if not(Hashtbl.mem envtable var) then (
+          stackOffset := !stackOffset + 16;
+        fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);
+        ) else (
+          fprintf fout "\tpushq %d(%%rbp)\n" (Hashtbl.find envtable var);
+        )
+      ) args_vars;
+      fprintf fout "\tpushq %%r12\n";
+      fprintf fout "\t## load %s.vtable\n" cname;
+      fprintf fout "\tmovq $%s..vtable, %%r14\n" cname;
+      let vtableOffset = (Hashtbl.find vtable (cname, mname)) in 
+      fprintf fout "\t## load %s() @ vt+%d\n" mname vtableOffset;
+      fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
+      fprintf fout "\t## call %s()\n" mname;
+      fprintf fout "\tcall *%%r14\n";
+      fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars);
+      fprintf fout "\tpopq %%rbp\n";
+      fprintf fout "\tpopq %%r12\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
+      stackOffset := !stackOffset -16;
+      funRetFlag := var;
+    | TAC_Assign_Dynamic_FunctionCall(var, mname, cname, args_vars) ->
       (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
-      fprintf fout "\t## Dynamic/static dispatch x86 goes here\n";
+      (* TODO: Add a VOID check for var, if caller is void then do a runtime error*)
+      fprintf fout "\n\t## %s(...) - Dynamic Dispatch\n" mname;
+      fprintf fout "\tpushq %%r12\n";
+      fprintf fout "\tpushq %%rbp\n";
+      stackOffset := !stackOffset + 16; (* caller object is on top of the stack*)
+      fprintf fout "\tmovq %d(%%rbp), %%r12\n" (!stackOffset);
+      List.iteri (fun i var -> 
+        let var = (tac_expr_to_name var) in
+        if not(Hashtbl.mem envtable var) then (
+          stackOffset := !stackOffset + 16;
+        fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);
+        ) else (
+          fprintf fout "\tpushq %d(%%rbp)\n" (Hashtbl.find envtable var);
+        )
+        ) args_vars;
+        fprintf fout "\tpushq %%r12\n";
+        fprintf fout "\t## load %s.vtable\n" cname;
+        fprintf fout "\tmovq 16(%%r12), %%r14\n";
+        let vtableOffset = (Hashtbl.find vtable (cname, mname)) in 
+        fprintf fout "\t## load %s() @ vt+%d\n" mname vtableOffset;
+        fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
+        fprintf fout "\t## call %s()\n" mname;
+        fprintf fout "\tcall *%%r14\n";
+        fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars);
+        fprintf fout "\tpopq %%rbp\n";
+        fprintf fout "\tpopq %%r12\n";
+        fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
+        stackOffset := !stackOffset -16;
+        funRetFlag := var;
     | TAC_Assign_Self_FunctionCall(var, mname, cname, args_vars) ->
       (* if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 16; funRetFlag := "";); *)
       funRetFlag := "";
-      fprintf fout "\n\t## %s(...)\n" mname;
+      fprintf fout "\n\t## %s(...) - Self Dispatch\n" mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
       List.iteri (fun i var -> 

@@ -499,6 +499,7 @@ let main() = (
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
         let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | Self_Dispatch((_,mname), args) -> 
         let retTacInstr = ref [] in
