@@ -1687,14 +1687,14 @@ in
           fprintf aout "\tpopq %%r12\n";
           fprintf aout "\tpopq %%rbp\n";
           fprintf aout "\tmovq %%r13, %%r15\n";
-          fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+          fprintf aout "\tmovq 32(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r14\n";
-          fprintf aout "\tmovq 32(%%rbp), %%r13\n";
+          fprintf aout "\tmovq 24(%%rbp), %%r13\n";
           fprintf aout "\tmovq 24(%%r13), %%r13\n";
           fprintf aout "\tmovq 24(%%r12), %%r12\n";
           fprintf aout "\tmovq %%r12, %%rdi\n";
-          fprintf aout "\tmovq %%r13, %%rsi\n";
-          fprintf aout "\tmovq %%r14, %%rdx\n";
+          fprintf aout "\tmovq %%r13, %%rsi ## start index\n ";
+          fprintf aout "\tmovq %%r14, %%rdx ## length\n ";
           fprintf aout "\tcall coolsubstr\n";
           fprintf aout "\tmovq %%rax, %%r13\n";
           fprintf aout "\tcmpq $0, %%r13\n";
