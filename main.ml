@@ -511,6 +511,11 @@ let main() = (
         | Some(stype) -> type_to_str_clean stype;
         | None -> "";
         in
+        let callerType =
+          match callerType with
+            | "SELF_TYPE" -> cname
+            | _ -> callerType
+        in
         let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, callerType, !args_vars) in
         Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(caller.loc) ^ ": Exception: dispatch on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
         voidCounter := !voidCounter + 1;
@@ -542,6 +547,11 @@ let main() = (
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
+        let name =
+          match name with
+            | "SELF_TYPE" -> cname
+            | _ -> name
+        in
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
@@ -699,7 +709,7 @@ let main() = (
         let joinNode = {
           label = exitlbl;
           comment = exitcomm;
-          blocks = [];
+          blocks = [TAC_Assign_Default(var, "Object")];
           true_branch = None;
           false_branch = None;
           parent_branches = [Some(predNode); Some(bodyNode)];
@@ -707,7 +717,7 @@ let main() = (
         predNode.true_branch <- Some(joinNode);
         bodyNode.false_branch <- Some(joinNode);
         currNode := joinNode;
-        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
+        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl] @ [TAC_Assign_Default(var, "Object")], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -1177,6 +1187,7 @@ let main() = (
         fprintf fout "\tpushq %%r12\n";
         fprintf fout "\t## load %s.vtable\n" cname;
         fprintf fout "\tmovq 16(%%r12), %%r14\n";
+        printf "dynamic dispatch for %s.%s\n" cname mname;
         let vtableOffset = (Hashtbl.find vtable (cname, mname)) in 
         fprintf fout "\t## load %s() @ vt+%d\n" mname vtableOffset;
         fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
