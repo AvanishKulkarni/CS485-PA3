@@ -1377,7 +1377,14 @@ in
       (* create activation record *)
       fprintf aout "\tpushq %%rbp\n"; 
       fprintf aout "\tmovq %%rsp, %%rbp\n"; 
-
+      let ntemps =List.fold_left (fun acc (_, _, aexp) ->
+        match aexp with
+        | Some(aexp) ->
+          max acc (numTemps aexp.exp_kind);
+        | None -> max acc 0;
+      ) 0 attrs + 1 in (* Adding 1 as assuming the return value is in a temporary*)
+      fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
+      fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
       (* allocate for class tag, obj size, vtable, attrs *)
       let attrs_ct = (match cname with 
       | "Bool" | "Int" | "String" -> 1
@@ -1405,11 +1412,32 @@ in
           match aexp with 
           | Some(aexp) -> (
             (* parse expression *)
-            fprintf aout "## %s: %s\n" cname aname;
+            fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
+            Hashtbl.clear envtable;
+            varCount := 0;
+            let node : cfg_node = {
+              label = TAC_Internal("");
+              comment = TAC_Comment("");
+              blocks = [];
+              true_branch = None;
+              false_branch = None;
+              parent_branches = [];
+            }
+            in
+            currNode := node;
+            visitedNodes := [];
+            (* TODO find the AST for the method and then run it *)      
+            let _, _ = convert aexp.exp_kind (fresh_var()) cname aname in
+            let stackOffset = ref 0 in
+            output_asm aout stackOffset (Some(node));
+            fprintf aout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+16);
+            fprintf aout "\tmovq %%r14, %d(%%r12)\n" (24+8*i);
           )
           | None -> (
             (* default initialization *)
-            fprintf aout "## %s: %s\n" cname aname;
+            fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
+            call_new aout atype;
+            fprintf aout "\tmovq %%r13, %d(%%r12)\n" (24+8*i);
           )
         )) attrs;
       ));
