@@ -1178,7 +1178,12 @@ let main() = (
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
       fprintf fout "\n\t## default assign\n";
-      call_new fout name;
+      match name with 
+      | "Int" | "Bool" | "String" -> 
+        call_new fout name;
+      | _ ->
+        fprintf fout "\tmovq $0, %%r13\n";
+      ;
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       (* printf "Adding var %s\n" var; *)
       Hashtbl.add envtable var !stackOffset;
