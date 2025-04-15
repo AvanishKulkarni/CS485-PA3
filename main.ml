@@ -117,6 +117,7 @@ let labelCount = ref 1;;
 
 let stringCounter = ref 0;;
 let divCounter = ref 0;;
+let voidCounter = ref 0;;
 
 let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
 let envtable : (string, int) Hashtbl.t = Hashtbl.create 255
@@ -511,6 +512,8 @@ let main() = (
         | None -> "";
         in
         let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, callerType, !args_vars) in
+        Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(caller.loc) ^ ": Exception: dispatch on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
+        voidCounter := !voidCounter + 1;
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | Self_Dispatch((_,mname), args) -> 
@@ -534,6 +537,8 @@ let main() = (
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
         let to_output = TAC_Assign_Static_FunctionCall(var, mname, stype, !args_vars) in
+        Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(caller.loc) ^ ": Exception: static dispatch on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
+        voidCounter := !voidCounter + 1;
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
@@ -767,6 +772,7 @@ let main() = (
 
   (* reset divCounter *)
   let divCounter = (ref 0) in 
+  let voidCounter = (ref 0) in
 
   (* convert TAC instructions into asm *)
   let funRetFlag = ref "" in
@@ -1081,6 +1087,21 @@ let main() = (
       fprintf fout "\tpushq %%rbp\n";
       stackOffset := !stackOffset + 16; (* caller object is on top of the stack*)
       fprintf fout "\tmovq %d(%%rbp), %%r12\n" (!stackOffset);
+
+      (* void check *)
+      fprintf fout "\tcmpq $0, %%r12\n";
+      fprintf fout "\tjne void_good_%d\n" !voidCounter;
+
+      (* use cooloutstr to error out *)
+      fprintf fout "\tmovq $%s, %%rdi\n" ("voidErrString" ^ string_of_int(!voidCounter));
+      fprintf fout "\tandq $-16, %%rsp\n";
+      fprintf fout "\tcall cooloutstr\n";
+      fprintf fout "\tandq $-16, %%rsp\n";
+      fprintf fout "\tmovl $1, %%edi\n";
+      fprintf fout "\tcall exit\n";
+
+      fprintf fout ".globl void_good_%d\nvoid_good_%d:\n" !voidCounter !voidCounter;
+      voidCounter := !voidCounter + 1;
       List.iteri (fun i var -> 
         let var = (tac_expr_to_name var) in
         if not(Hashtbl.mem envtable var) then (
@@ -1112,6 +1133,22 @@ let main() = (
       fprintf fout "\tpushq %%rbp\n";
       stackOffset := !stackOffset + 16; (* caller object is on top of the stack*)
       fprintf fout "\tmovq %d(%%rbp), %%r12\n" (!stackOffset);
+
+      (* void check *)
+      fprintf fout "\tcmpq $0, %%r12\n";
+      fprintf fout "\tjne void_good_%d\n" !voidCounter;
+
+      (* use cooloutstr to error out *)
+      fprintf fout "\tmovq $%s, %%rdi\n" ("voidErrString" ^ string_of_int(!voidCounter));
+      fprintf fout "\tandq $-16, %%rsp\n";
+      fprintf fout "\tcall cooloutstr\n";
+      fprintf fout "\tandq $-16, %%rsp\n";
+      fprintf fout "\tmovl $1, %%edi\n";
+      fprintf fout "\tcall exit\n";
+
+      fprintf fout ".globl void_good_%d\nvoid_good_%d:\n" !voidCounter !voidCounter;
+      voidCounter := !voidCounter + 1;
+
       List.iteri (fun i var -> 
         let var = (tac_expr_to_name var) in
         if not(Hashtbl.mem envtable var) then (
