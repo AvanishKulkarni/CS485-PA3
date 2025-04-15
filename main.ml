@@ -511,6 +511,11 @@ let main() = (
         | Some(stype) -> type_to_str_clean stype;
         | None -> "";
         in
+        let callerType =
+          match callerType with
+            | "SELF_TYPE" -> cname
+            | _ -> callerType
+        in
         let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, callerType, !args_vars) in
         Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(caller.loc) ^ ": Exception: dispatch on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
         voidCounter := !voidCounter + 1;
@@ -542,6 +547,11 @@ let main() = (
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
+        let name =
+          match name with
+            | "SELF_TYPE" -> cname
+            | _ -> name
+        in
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
@@ -699,7 +709,7 @@ let main() = (
         let joinNode = {
           label = exitlbl;
           comment = exitcomm;
-          blocks = [];
+          blocks = [TAC_Assign_Default(var, "Object")];
           true_branch = None;
           false_branch = None;
           parent_branches = [Some(predNode); Some(bodyNode)];
@@ -707,7 +717,7 @@ let main() = (
         predNode.true_branch <- Some(joinNode);
         bodyNode.false_branch <- Some(joinNode);
         currNode := joinNode;
-        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
+        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl] @ [TAC_Assign_Default(var, "Object")], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -1337,6 +1347,7 @@ in
   Hashtbl.add asm_strings "%d" "percent.d";
   Hashtbl.add asm_strings "%ld" "percent.ld";
   Hashtbl.add asm_strings "" "the.empty.string";
+  Hashtbl.add asm_strings "%s%s" "concat.string";
   Hashtbl.add asm_strings "ERROR: 0: Exception: String.substr out of range\\n" "substr.error.string";
   Hashtbl.add asm_strings "abort\\n" "abort.string";
 
@@ -1367,7 +1378,14 @@ in
       (* create activation record *)
       fprintf aout "\tpushq %%rbp\n"; 
       fprintf aout "\tmovq %%rsp, %%rbp\n"; 
-
+      let ntemps =List.fold_left (fun acc (_, _, aexp) ->
+        match aexp with
+        | Some(aexp) ->
+          max acc (numTemps aexp.exp_kind);
+        | None -> max acc 0;
+      ) 0 attrs + 1 in (* Adding 1 as assuming the return value is in a temporary*)
+      fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
+      fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
       (* allocate for class tag, obj size, vtable, attrs *)
       let attrs_ct = (match cname with 
       | "Bool" | "Int" | "String" -> 1
@@ -1395,11 +1413,32 @@ in
           match aexp with 
           | Some(aexp) -> (
             (* parse expression *)
-            fprintf aout "## %s: %s\n" cname aname;
+            fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
+            Hashtbl.clear envtable;
+            varCount := 0;
+            let node : cfg_node = {
+              label = TAC_Internal("");
+              comment = TAC_Comment("");
+              blocks = [];
+              true_branch = None;
+              false_branch = None;
+              parent_branches = [];
+            }
+            in
+            currNode := node;
+            visitedNodes := [];
+            (* TODO find the AST for the method and then run it *)      
+            let _, _ = convert aexp.exp_kind (fresh_var()) cname aname in
+            let stackOffset = ref 0 in
+            output_asm aout stackOffset (Some(node));
+            fprintf aout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+16);
+            fprintf aout "\tmovq %%r14, %d(%%r12)\n" (24+8*i);
           )
           | None -> (
             (* default initialization *)
-            fprintf aout "## %s: %s\n" cname aname;
+            fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
+            call_new aout atype;
+            fprintf aout "\tmovq %%r13, %d(%%r12)\n" (24+8*i);
           )
         )) attrs;
       ));
@@ -1475,7 +1514,7 @@ in
         fprintf aout "%s.%s:\n" cname mname;
         fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
 
-        (* copied from reference compiler *)
+        (* modified from reference compiler *)
         (match cname, mname with 
         | "IO", "in_int" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
@@ -1555,14 +1594,8 @@ in
         )
         | "IO", "in_string" -> (
           fprintf aout "\tsubq $16, %%rsp\n";
-          fprintf aout "\tpushq %%rbp\n";
-          fprintf aout "\tpushq %%r12\n";
-          fprintf aout "\tmovq $String..new, %%r14\n";
-          fprintf aout "\tcall *%%r14\n";
-          fprintf aout "\tpopq %%r12\n";
-          fprintf aout "\tpopq %%rbp\n";
+          call_new aout "String";
           fprintf aout "\tmovq %%r13, %%r14\n";
-          fprintf aout "\t## guarantee 16-byte alignment before call\n";
           fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall coolgetstr\n";
           fprintf aout "\tmovq %%rax, %%r13\n";
@@ -1642,12 +1675,7 @@ in
         | "String", "length" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
           fprintf aout "\tsubq $8, %%rsp\n";
-          fprintf aout "\tpushq %%rbp\n";
-          fprintf aout "\tpushq %%r12\n";
-          fprintf aout "\tmovq $Int..new, %%r14\n";
-          fprintf aout "\tcall *%%r14\n";
-          fprintf aout "\tpopq %%r12\n";
-          fprintf aout "\tpopq %%rbp\n";
+          call_new aout "Int";
           fprintf aout "\tmovq %%r13, %%r14\n";
           fprintf aout "\tmovq 24(%%r12), %%r13\n";
           fprintf aout "\tmovq %%r13, %%rdi\n";
@@ -1715,7 +1743,7 @@ in
     )) internal_impl_map;
 
     (* cooloutstr - copied from ref compiler *)
-    fprintf aout ".globl cooloutstr\n";
+    fprintf aout "\n.globl cooloutstr\n";
     fprintf aout "cooloutstr:\n";
     fprintf aout "\tpushq	%%rbp\n";
     fprintf aout "\tmovq	%%rsp, %%rbp\n";
@@ -1798,17 +1826,11 @@ in
 
 
     (* coolstrlen - copied from ref compiler *)
-    fprintf aout ".globl coolstrlen\n";
-    fprintf aout ".type coolstrlen, @function\n";
+    fprintf aout "\n.globl coolstrlen\n";
     fprintf aout "coolstrlen:\n";
     fprintf aout ".LFB7:\n";
-    fprintf aout "\t.cfi_startproc\n";
-    fprintf aout "\tendbr64\n";
     fprintf aout "\tpushq	%%rbp\n";
-    fprintf aout "\t.cfi_def_cfa_offset 16\n";
-    fprintf aout "\t.cfi_offset 6, -16\n";
     fprintf aout "\tmovq %%rsp, %%rbp\n";
-    fprintf aout "\t.cfi_def_cfa_register 6\n";
     fprintf aout "\tmovq %%rdi, -24(%%rbp)\n";
     fprintf aout "\tmovl $0, -4(%%rbp)\n";
     fprintf aout "\tjmp .L7\n";
@@ -1826,18 +1848,12 @@ in
     fprintf aout "\tjne .L8\n";
     fprintf aout "\tmovl -4(%%rbp), %%eax\n";
     fprintf aout "\tpopq %%rbp\n";
-    fprintf aout "\t.cfi_def_cfa 7, 8\n";
     fprintf aout "\tret\n";
-    fprintf aout "\t.cfi_endproc\n";
     fprintf aout ".LFE7:\n";
-    fprintf aout "\t.size	coolstrlen, .-coolstrlen\n";
-    fprintf aout "\t.section	.rodata\n";
+    
 
-    (* coolstrcat - copied from ref compiler *)
-    fprintf aout ".LC0:\n";
-    fprintf aout ".string	\"%%s%%s\"\n";
-    fprintf aout ".text\n";
-    fprintf aout ".globl	coolstrcat\n";
+    (* coolstrcat - modified from ref compiler *)
+    fprintf aout "\n.globl	coolstrcat\n";
     fprintf aout "coolstrcat:\n";
     fprintf aout "\tpushq	%%rbp\n";
     fprintf aout "\tmovq	%%rsp, %%rbp\n";
@@ -1879,7 +1895,7 @@ in
     fprintf aout "\t\n";
     fprintf aout "\tmovq	-24(%%rbp), %%rdi\n";
     fprintf aout "\tmovq	-32(%%rbp), %%rsi\n";
-    fprintf aout "\tmovq	$.LC0, %%rdx\n";
+    fprintf aout "\tmovq	$concat.string, %%rdx\n";
     fprintf aout "\tmovq	-40(%%rbp), %%rcx\n";
     fprintf aout "\tmovq	-48(%%rbp), %%r8\n";
     fprintf aout "\t\n";
