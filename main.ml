@@ -793,23 +793,13 @@ let main() = (
       (* printf "Searching for var %s\n" var; *)
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16);
       funRetFlag := "";
-      fprintf fout "\n\t## identifier\n";
+      fprintf fout "\n\t## assign identifier %s <- %s\n" var i;
       if not (Hashtbl.mem envtable i) then (
         stackOffset := !stackOffset + 16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset) (* TODO: broken *)
       ) else ( (* move top of stack *)
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable i);
       );
-
-      (* 
-      if not(Hashtbl.mem envtable (tac_expr_to_name i2)) then (
-        stackOffset := !stackOffset +16;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-      ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
-      );
-      
-      *)
       
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
@@ -817,7 +807,7 @@ let main() = (
     | TAC_Assign_Int(var, i) ->
       (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
       funRetFlag := ""; *)
-      fprintf fout "\n\t## int provided\n";
+      fprintf fout "\n\t## %s <- int %s\n" var i;
       call_new fout "Int";
       fprintf fout "\tmovq $%s, 24(%%r13)\n" i;
       (* fprintf fout "\tmovq 24(%%r13), %%r13\n"; *)
@@ -1109,7 +1099,7 @@ let main() = (
     | TAC_Assign_Static_FunctionCall(var, mname, cname, args_vars) ->
             (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
       (* TODO: Add a VOID check for var, if caller is void then do a runtime error*)
-      fprintf fout "\n\t## %s(...) - Static Dispatch\n" mname;
+      fprintf fout "\n\t## %s <- call %s(...) - Static Dispatch\n" var mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
       stackOffset := !stackOffset + 16; (* caller object is on top of the stack*)
@@ -1155,7 +1145,7 @@ let main() = (
     | TAC_Assign_Dynamic_FunctionCall(var, mname, cname, args_vars) ->
       (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
       (* TODO: Add a VOID check for var, if caller is void then do a runtime error*)
-      fprintf fout "\n\t## %s(...) - Dynamic Dispatch\n" mname;
+      fprintf fout "\n\t## %s <- call %s(...) - Dynamic Dispatch\n" var mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
       stackOffset := !stackOffset + 16; (* caller object is on top of the stack*)
@@ -1202,7 +1192,7 @@ let main() = (
     | TAC_Assign_Self_FunctionCall(var, mname, cname, args_vars) ->
       (* if !funRetFlag <> "" && not(List.mem (TAC_Variable(!funRetFlag)) args_vars) then (stackOffset := !stackOffset + 16; funRetFlag := "";); *)
       funRetFlag := "";
-      fprintf fout "\n\t## %s(...) - Self Dispatch\n" mname;
+      fprintf fout "\n\t## %s <- call %s(...) - Self Dispatch\n" var mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
       List.iteri (fun i var -> 
@@ -1241,7 +1231,7 @@ let main() = (
     | TAC_Assign_Default(var, name) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "\n\t## default assign\n";
+      fprintf fout "\n\t## %s <- default %s\n" var name;
       match name with 
       | "Int" | "Bool" | "String" -> 
         call_new fout name;
@@ -1253,18 +1243,18 @@ let main() = (
       Hashtbl.add envtable var (sprintf "%d(%%rbp)"!stackOffset);
       stackOffset := !stackOffset -16;
     | TAC_Assign_Assign(var, i) ->
-      (* printf "Searching for var %s\n" var; *)
+      fprintf fout "\n\n## TAC_Assign_Assign\n";
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "\n\t## update identifier\n";
+      fprintf fout "\n\t## update identifier %s\n" var;
       if not(Hashtbl.mem envtable (tac_expr_to_name i)) then (
-        stackOffset := !stackOffset +16;
+        stackOffset := !stackOffset + 16; (* pop top of stack *)
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
       ) else (
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
       );
       if Hashtbl.mem envtable var then (
-        fprintf fout "\tmovq %%r14, %s\n"(Hashtbl.find envtable var);
+        fprintf fout "\tmovq %%r14, %s\n" (Hashtbl.find envtable var);
       );
     | TAC_Branch_True(cond, label) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";); 
