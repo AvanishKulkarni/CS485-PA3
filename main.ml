@@ -1253,19 +1253,16 @@ let main() = (
       stackOffset := !stackOffset -16;
     | TAC_Assign_Assign(var, i) ->
       (* printf "Searching for var %s\n" var; *)
-      fprintf fout "\n\n## TAC_Assign_Assign\n";
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
-      fprintf fout "\n\t## update identifier %s\n" var;
+      fprintf fout "\n\t## update identifier\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i)) then (
-        stackOffset := !stackOffset + 16; (* pop top of stack *)
+        stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
       ) else (
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
       );
-      if Hashtbl.mem envtable var then (
-        fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
-      );
+      fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
     | TAC_Branch_True(cond, label) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";); 
       funRetFlag := "";
