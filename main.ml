@@ -1438,8 +1438,12 @@ in
           | None -> (
             (* default initialization *)
             fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
-            call_new aout atype;
-            fprintf aout "\tmovq %%r13, %d(%%r12)\n" (24+8*i);
+            match atype with
+            | "Bool" | "Int" | "String" ->
+              call_new aout atype;
+              fprintf aout "\tmovq %%r13, %d(%%r12)\n" (24+8*i);
+            | _ ->
+              fprintf aout "\tmovq $0, %d(%%r12)\n" (24+8*i);
           )
         )) attrs;
       ));

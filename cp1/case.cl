@@ -1,7 +1,9 @@
 class Main inherits IO {
     main() : Object {
-        let a : G <- new G in
+        let a : G, z : Int in
         {
+            a <- new G;
+            z <-
             case a of
                 x: B => 1;
                 y: C => 2;
@@ -9,6 +11,7 @@ class Main inherits IO {
                 b: F => 4;
                 c: G => 5;
             esac;
+            out_int(z);
         }
     };
 };
