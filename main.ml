@@ -120,8 +120,9 @@ let divCounter = ref 0;;
 let voidCounter = ref 0;;
 
 let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
-let envtable : (string, int) Hashtbl.t = Hashtbl.create 255
+let envtable : (string, string) Hashtbl.t = Hashtbl.create 255
 let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 
+let attrLocations : (string, string * int) Hashtbl.t = Hashtbl.create 255
 
 let main() = (
   Printexc.record_backtrace true;
@@ -797,7 +798,7 @@ let main() = (
         stackOffset := !stackOffset + 16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset) (* TODO: broken *)
       ) else ( (* move top of stack *)
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable i);
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable i);
       );
 
       (* 
@@ -855,14 +856,14 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i1)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
+        fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovq 24(%%r15), %%r15\n";
       fprintf fout "\taddq %%r14, %%r15\n";
@@ -880,14 +881,14 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i1)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
+        fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovq 24(%%r15), %%r15\n";
       fprintf fout "\tsubq %%r14, %%r15\n";
@@ -905,14 +906,14 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i1)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
+        fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovq 24(%%r15), %%r15\n";
       fprintf fout "\timulq %%r14, %%r15\n";
@@ -930,14 +931,14 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i1)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
+        fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovl 24(%%r15), %%eax\n";
       fprintf fout "\txorq %%rdx, %%rdx\n";
@@ -972,14 +973,14 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i1)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
+        fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tandq $-16, %%rsp\n";
@@ -999,14 +1000,14 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i1)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
+        fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tandq $-16, %%rsp\n";
@@ -1026,14 +1027,14 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i1));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i2)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i2));
+        fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
       fprintf fout "\tmovl 24(%%r15), %%esi\n";
       fprintf fout "\tandq $-16, %%rsp\n";
@@ -1053,7 +1054,7 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
       );
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
       fprintf fout "\tnegl %%edi\n";
@@ -1071,7 +1072,7 @@ let main() = (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
       );
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       fprintf fout "\txorq $1, %%r14\n";
@@ -1095,7 +1096,7 @@ let main() = (
         stackOffset := !stackOffset + 16; (* pop top of stack *)
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
       );
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
@@ -1134,7 +1135,7 @@ let main() = (
           stackOffset := !stackOffset + 16;
         fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);
         ) else (
-          fprintf fout "\tpushq %d(%%rbp)\n" (Hashtbl.find envtable var);
+          fprintf fout "\tpushq %s\n" (Hashtbl.find envtable var);
         )
       ) args_vars;
       fprintf fout "\tpushq %%r12\n";
@@ -1181,7 +1182,7 @@ let main() = (
           stackOffset := !stackOffset + 16;
         fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);
         ) else (
-          fprintf fout "\tpushq %d(%%rbp)\n" (Hashtbl.find envtable var);
+          fprintf fout "\tpushq %s\n" (Hashtbl.find envtable var);
         )
         ) args_vars;
         fprintf fout "\tpushq %%r12\n";
@@ -1210,7 +1211,7 @@ let main() = (
           stackOffset := !stackOffset + 16;
         fprintf fout "\tpushq %d(%%rbp)\n" (!stackOffset);
         ) else (
-          fprintf fout "\tpushq %d(%%rbp)\n" (Hashtbl.find envtable var);
+          fprintf fout "\tpushq %s\n" (Hashtbl.find envtable var);
         )
         ) args_vars;
 
@@ -1249,7 +1250,7 @@ let main() = (
       ;
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       (* printf "Adding var %s\n" var; *)
-      Hashtbl.add envtable var !stackOffset;
+      Hashtbl.add envtable var (sprintf "%d(%%rbp)"!stackOffset);
       stackOffset := !stackOffset -16;
     | TAC_Assign_Assign(var, i) ->
       (* printf "Searching for var %s\n" var; *)
@@ -1261,10 +1262,10 @@ let main() = (
         stackOffset := !stackOffset + 16; (* pop top of stack *)
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
+        fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
       );
       if Hashtbl.mem envtable var then (
-        fprintf fout "\tmovq %%r14, %d(%%rbp)\n"(Hashtbl.find envtable var);
+        fprintf fout "\tmovq %%r14, %s\n"(Hashtbl.find envtable var);
       );
     | TAC_Branch_True(cond, label) ->
       if !funRetFlag <> "" then (stackOffset := !stackOffset + 16; funRetFlag := "";); 
@@ -1274,7 +1275,7 @@ let main() = (
         stackOffset := !stackOffset + 16;
         fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
       ) else (
-        fprintf fout "\tmovq %d(%%rbp), %%r13\n" (Hashtbl.find envtable cond);
+        fprintf fout "\tmovq %s, %%r13\n" (Hashtbl.find envtable cond);
       );
       fprintf fout "\tcmpq $0, 24(%%r13)\n";
       fprintf fout "\tje %s\n" label;
@@ -1410,12 +1411,13 @@ in
       | _ -> (
         List.iteri (fun i (aname, atype, aexp) -> (
           (* TODO: Impl Later *)
+          Hashtbl.add ident_tac aname (TAC_Variable(aname));
+          Hashtbl.add attrLocations cname (aname, (24+8*i));
           match aexp with 
           | Some(aexp) -> (
             (* parse expression *)
             fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
             Hashtbl.clear envtable;
-            varCount := 0;
             let node : cfg_node = {
               label = TAC_Internal("");
               comment = TAC_Comment("");
@@ -1468,11 +1470,13 @@ in
 
         (* add hashtbl offset entries for each formal, relative to %rbp *)
         Hashtbl.clear envtable;
+        List.iter( fun (aname, loc) ->
+          Hashtbl.add envtable aname (sprintf "%d(%%r12)" loc);
+        ) (List.rev (Hashtbl.find_all attrLocations cname));
         List.iteri (fun i name -> 
           fprintf aout "\t## fp[%d] = %s\n" (3+i) name;
-          Hashtbl.add envtable name (24+8*i);  
+          Hashtbl.add envtable name (sprintf "%d(%%rbp)" (24+8*i));  
         ) (formals);
-        varCount := 0;
         let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
         fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
         fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);

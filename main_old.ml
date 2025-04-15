@@ -26,8 +26,9 @@ type tac_instr =
   | TAC_Assign_ObjectAlloc of label * label (* might have to change to tac_expr *)
   | TAC_Assign_ObjectDefault of label * label
   | TAC_Assign_NullCheck of label * tac_expr
-  | TAC_Assign_FunctionCall of label * label * (tac_expr list) option
-  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list) option
+  | TAC_Assign_Dynamic_FunctionCall of label * label * label * (tac_expr list)
+  | TAC_Assign_Static_FunctionCall of label * label * label * (tac_expr list)
+  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list)
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
   | TAC_Remove_Let of label
@@ -58,6 +59,7 @@ let tac_expr_to_name t = match t with TAC_Variable c -> c
 type static_type =
   | Class of string (* ex "Int" or "Object" *)
   | SELF_TYPE of string
+let type_to_str_clean t = match t with Class c | SELF_TYPE c -> c
 
 type cool_program = cool_class list
 and loc = int
@@ -388,13 +390,14 @@ let main() = (
     match a with
       | Identifier(v) -> 
         let _, name = v in
-        printf "looking up %s\n" name;
+        printf "Identifier %s\n" name;
         (match Hashtbl.find_opt ident_tac name with 
         | Some(ta) -> 
-          printf "found <%s:%s>, returning\n" name (tac_expr_to_name ta);
+          (* printf "found -> returning %s\n" (tac_expr_to_name ta); *)
           !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, (tac_expr_to_name ta))];
           [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
         | None -> 
+          (* printf "created %s \n" name; *)
           Hashtbl.add ident_tac name (TAC_Variable(var));
           !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, name)];
           [TAC_Assign_Identifier(var, name)], TAC_Variable(var))
@@ -498,7 +501,16 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
-        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        let callerType = match caller.static_type with
+        | Some(stype) -> type_to_str_clean stype;
+        | None -> "";
+        in
+        let callerType =
+          match callerType with
+            | "SELF_TYPE" -> cname
+            | _ -> callerType
+        in
+        let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, callerType, !args_vars) in
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | Self_Dispatch((_,mname), args) -> 
@@ -509,10 +521,10 @@ let main() = (
           retTacInstr := List.append !retTacInstr i;
           args_vars := List.append !args_vars [ta]
         ) args;
-        let to_output = TAC_Assign_Self_FunctionCall(var, mname, cname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Self_FunctionCall(var, mname, cname, !args_vars) in
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ [to_output]), TAC_Variable(var)
-      | Static_Dispatch(caller, _, (_, mname), args) ->
+      | Static_Dispatch(caller, (_, stype), (_, mname), args) ->
         let retTacInstr = ref [] in
         let args_vars = ref [] in
         List.iter(fun a ->
@@ -521,9 +533,15 @@ let main() = (
           args_vars := List.append !args_vars [ta]
         ) args;
         let i, ta = convert caller.exp_kind (fresh_var ()) cname mname in
-        let to_output = TAC_Assign_FunctionCall(var, mname, Some(!args_vars)) in
+        let to_output = TAC_Assign_Static_FunctionCall(var, mname, stype, !args_vars) in
+        !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
+        let name =
+          match name with
+            | "SELF_TYPE" -> cname
+            | _ -> name
+        in
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
@@ -555,11 +573,12 @@ let main() = (
         List.iter
             (fun (Binding ((_, vname), (_, _), _)) ->
               Hashtbl.remove ident_tac vname;
-              )
+            )
             bindlist;
         !currNode.blocks <- !currNode.blocks @ !removeScope;
         (!retTacInstr @ i @ !removeScope), TAC_Variable(var)
       | Assign((_, name), exp) ->
+        printf "Assign %s\n" name;
         let tac_var = Hashtbl.find ident_tac name in
         (* Hashtbl.add ident_tac name (TAC_Variable(var)); *)
         let i, ta = convert exp.exp_kind (fresh_var ())cname mname in
@@ -651,7 +670,7 @@ let main() = (
         };
         
         let pinstr, pexp = convert pred.exp_kind predvar cname mname in 
-        let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in 
+        (* let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in *) 
         let bexit = TAC_Branch_True(notpredvar, exitlblname) in 
         !currNode.blocks <- !currNode.blocks @ [bexit];
         let predNode = !currNode in
@@ -681,7 +700,7 @@ let main() = (
         let joinNode = {
           label = exitlbl;
           comment = exitcomm;
-          blocks = [];
+          blocks = [TAC_Assign_Default(var, "Object")];
           true_branch = None;
           false_branch = None;
           parent_branches = [Some(predNode); Some(bodyNode)];
@@ -689,7 +708,7 @@ let main() = (
         predNode.true_branch <- Some(joinNode);
         bodyNode.false_branch <- Some(joinNode);
         currNode := joinNode;
-        [predlbl] @ pinstr @ [notpred] @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
+        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl] @ [TAC_Assign_Default(var, "Object")], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -723,13 +742,15 @@ let main() = (
         fprintf fout "%s <- not %s\n" var (tac_expr_to_name i)
       | TAC_Assign_NullCheck(var, i) ->
         fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
-      | TAC_Assign_FunctionCall(var, mname, None) ->
+      | TAC_Assign_Static_FunctionCall(var, mname, stype, args_vars) ->
         fprintf fout "%s <- call %s\n" var mname;
-      | TAC_Assign_FunctionCall(var, mname, Some(args_vars)) ->
+        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+        fprintf fout "\n";
+      | TAC_Assign_Dynamic_FunctionCall(var, mname, caller, args_vars) ->
         fprintf fout "%s <- call %s" var mname;
         List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
         fprintf fout "\n";
-      | TAC_Assign_Self_FunctionCall(var, mname, cname, Some(args_vars)) ->
+      | TAC_Assign_Self_FunctionCall(var, mname, cname, args_vars) ->
         fprintf fout "%s <- call %s" var mname;
         List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
         fprintf fout "\n";
@@ -795,6 +816,12 @@ let main() = (
       | Method _ -> true 
       | _ -> false
       ) features in
+    List.iter ( fun x ->
+      match x with
+      | Attribute((_,name), _, _) ->
+        Hashtbl.add ident_tac name (TAC_Variable(name));
+      | _ -> printf "";
+    ) features;
     match first_method with
     | Method((_, mname), _, _, mexp) ->
       (* fprintf fout "label %s_%s_0\n" cname mname; *)
