@@ -1990,16 +1990,10 @@ in
 
     (* coolsubstr - copied from ref compiler *)
     fprintf aout ".globl	coolsubstr\n";
-    fprintf aout ".type	coolsubstr, @function\n";
     fprintf aout "coolsubstr:\n";
     fprintf aout ".LFB10:\n";
-    fprintf aout "\t.cfi_startproc\n";
-    fprintf aout "\tendbr64\n";
     fprintf aout "\tpushq	%%rbp\n";
-    fprintf aout "\t.cfi_def_cfa_offset 16\n";
-    fprintf aout "\t.cfi_offset 6, -16\n";
     fprintf aout "\tmovq	%%rsp, %%rbp\n";
-    fprintf aout "\t.cfi_def_cfa_register 6\n";
     fprintf aout "\tsubq	$48, %%rsp\n";
     fprintf aout "\tmovq	%%rdi, -24(%%rbp)\n";
     fprintf aout "\tmovq	%%rsi, -32(%%rbp)\n";
@@ -2029,14 +2023,11 @@ in
     fprintf aout "\taddq	%%rcx, %%rdx\n";
     fprintf aout "\tmovq	%%rax, %%rsi\n";
     fprintf aout "\tmovq	%%rdx, %%rdi\n";
-    fprintf aout "\tcall	strndup@PLT\n";
+    fprintf aout "\tcall	strndup\n";
     fprintf aout ".L24:\n";
     fprintf aout "\tleave\n";
-    fprintf aout "\t.cfi_def_cfa 7, 8\n";
     fprintf aout "\tret\n";
-    fprintf aout "\t.cfi_endproc\n";
     fprintf aout ".LFE10:\n";
-    fprintf aout "\t.size	coolsubstr, .-coolsubstr\n";
 
 
     fprintf aout "\n## INTERNAL METHOD BODIES END\n";
