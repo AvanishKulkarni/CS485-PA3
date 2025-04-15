@@ -1285,14 +1285,18 @@ in
         fprintf aout "\tmovq 16(%%rbp), %%r12\n";
 
         (* add hashtbl offset entries for each formal, relative to %rbp *)
-
-
+        Hashtbl.clear envtable;
+        List.iteri (fun i name -> 
+          fprintf aout "\t## fp[%d] = %s\n" (3+i) name;
+          Hashtbl.add envtable name (24+8*i);  
+        ) (formals);
+        varCount := 0;
         let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
         fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
         fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
         let node : cfg_node = {
           label = TAC_Internal("");
-          comment = TAC_Comment("start");
+          comment = TAC_Comment("\tstart");
           blocks = [];
           true_branch = None;
           false_branch = None;
@@ -1300,10 +1304,12 @@ in
         }
         in
         currNode := node;
+        visitedNodes := [];
         (* TODO find the AST for the method and then run it *)      
         let _, _ = convert body.exp_kind (fresh_var()) cname mname in
-        output_asm aout (ref 0) (Some(node));
-
+        let stackOffset = ref 0 in
+        output_asm aout stackOffset (Some(node));
+        fprintf aout "\tmovq %d(%%rbp), %%r13\n" (!stackOffset + 16);
         fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
       )) non_inherited_methods;
     )) user_impl_map;
