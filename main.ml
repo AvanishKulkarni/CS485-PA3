@@ -1187,7 +1187,6 @@ let main() = (
         fprintf fout "\tpushq %%r12\n";
         fprintf fout "\t## load %s.vtable\n" cname;
         fprintf fout "\tmovq 16(%%r12), %%r14\n";
-        printf "dynamic dispatch for %s.%s\n" cname mname;
         let vtableOffset = (Hashtbl.find vtable (cname, mname)) in 
         fprintf fout "\t## load %s() @ vt+%d\n" mname vtableOffset;
         fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
