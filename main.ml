@@ -1074,11 +1074,27 @@ let main() = (
     | TAC_Assign_NullCheck(var, i) ->
       (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := ""; *) (* check if this is a tempporary, if so then delete*)
-      fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
       (* TODO later *)
       (* if class tag is Int, String, Bool -> return Bool(false) *)
       (* if class tag is something else, check if not initialized *)
       (* return Bool(true) if not initialized, Bool(false) otherwise *)
+      if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
+      funRetFlag := "";
+      fprintf fout "\n\t## isvoid\n";
+      if not(Hashtbl.mem envtable (tac_expr_to_name i)) then (
+        stackOffset := !stackOffset + 16; (* pop top of stack *)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
+      ) else (
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i));
+      );
+      fprintf fout "\tpushq %%r12\n";
+      fprintf fout "\tpushq %%rbp\n";
+      fprintf fout "\tmovq %%r14, %%rdi\n";
+      fprintf fout "\tcall is_void\n";
+      fprintf fout "\tpopq %%rbp\n";
+      fprintf fout "\tpopq %%r12\n";
+      fprintf fout "\tmovq %%r13, %d(%%rbp)" !stackOffset;
+      stackOffset := !stackOffset -16;
     | TAC_Assign_Static_FunctionCall(var, mname, cname, args_vars) ->
             (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
       (* TODO: Add a VOID check for var, if caller is void then do a runtime error*)
@@ -2068,6 +2084,18 @@ in
     fprintf aout ".globl eq_handler_end\neq_handler_end:\n";
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
 
+    (* print out is_void *)
+    fprintf aout "\n## is_void\n";
+    fprintf aout ".globl is_void\nis_void:\n";
+    fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+    fprintf aout "\tpushq %%rdi\n";
+    fprintf aout "\tcall Bool..new\n";
+    fprintf aout "\tpopq %%rdi\n";
+    fprintf aout "\tcmpq $0, %%rdi\n";
+    fprintf aout "\tjne is_void_false\n";
+    fprintf aout "\tmovq $1, 24(%%r13)\n";
+    fprintf aout ".globl is_void_false\nis_void_false:\n";
+    fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
     (* print out program start *)
 
     fprintf aout "\n## PROGRAM BEGINS HERE\n";
