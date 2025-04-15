@@ -511,6 +511,11 @@ let main() = (
         | Some(stype) -> type_to_str_clean stype;
         | None -> "";
         in
+        let callerType =
+          match callerType with
+            | "SELF_TYPE" -> cname
+            | _ -> callerType
+        in
         let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, callerType, !args_vars) in
         Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(caller.loc) ^ ": Exception: dispatch on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
         voidCounter := !voidCounter + 1;
@@ -542,6 +547,11 @@ let main() = (
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
+        let name =
+          match name with
+            | "SELF_TYPE" -> cname
+            | _ -> name
+        in
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
@@ -699,7 +709,7 @@ let main() = (
         let joinNode = {
           label = exitlbl;
           comment = exitcomm;
-          blocks = [];
+          blocks = [TAC_Assign_Default(var, "Object")];
           true_branch = None;
           false_branch = None;
           parent_branches = [Some(predNode); Some(bodyNode)];
@@ -707,7 +717,7 @@ let main() = (
         predNode.true_branch <- Some(joinNode);
         bodyNode.false_branch <- Some(joinNode);
         currNode := joinNode;
-        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl], TAC_Variable(var)
+        [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl] @ [TAC_Assign_Default(var, "Object")], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -1367,7 +1377,14 @@ in
       (* create activation record *)
       fprintf aout "\tpushq %%rbp\n"; 
       fprintf aout "\tmovq %%rsp, %%rbp\n"; 
-
+      let ntemps =List.fold_left (fun acc (_, _, aexp) ->
+        match aexp with
+        | Some(aexp) ->
+          max acc (numTemps aexp.exp_kind);
+        | None -> max acc 0;
+      ) 0 attrs + 1 in (* Adding 1 as assuming the return value is in a temporary*)
+      fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
+      fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
       (* allocate for class tag, obj size, vtable, attrs *)
       let attrs_ct = (match cname with 
       | "Bool" | "Int" | "String" -> 1
@@ -1395,11 +1412,32 @@ in
           match aexp with 
           | Some(aexp) -> (
             (* parse expression *)
-            fprintf aout "## %s: %s\n" cname aname;
+            fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
+            Hashtbl.clear envtable;
+            varCount := 0;
+            let node : cfg_node = {
+              label = TAC_Internal("");
+              comment = TAC_Comment("");
+              blocks = [];
+              true_branch = None;
+              false_branch = None;
+              parent_branches = [];
+            }
+            in
+            currNode := node;
+            visitedNodes := [];
+            (* TODO find the AST for the method and then run it *)      
+            let _, _ = convert aexp.exp_kind (fresh_var()) cname aname in
+            let stackOffset = ref 0 in
+            output_asm aout stackOffset (Some(node));
+            fprintf aout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+16);
+            fprintf aout "\tmovq %%r14, %d(%%r12)\n" (24+8*i);
           )
           | None -> (
             (* default initialization *)
-            fprintf aout "## %s: %s\n" cname aname;
+            fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
+            call_new aout atype;
+            fprintf aout "\tmovq %%r13, %d(%%r12)\n" (24+8*i);
           )
         )) attrs;
       ));
