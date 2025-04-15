@@ -805,8 +805,8 @@ let main() = (
       stackOffset := !stackOffset -16;
       fprintf fout "";
     | TAC_Assign_Int(var, i) ->
-      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
-      funRetFlag := ""; *)
+      if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
+      funRetFlag := "";
       fprintf fout "\n\t## %s <- int %s\n" var i;
       call_new fout "Int";
       fprintf fout "\tmovq $%s, 24(%%r13)\n" i;
@@ -814,8 +814,8 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
     | TAC_Assign_Bool(var, i) ->
-      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
-      funRetFlag := ""; *)
+      if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
+      funRetFlag := "";
       fprintf fout "\n\t## boolean provided\n";
       call_new fout "Bool";
       let bool_int = match i with 
@@ -828,8 +828,8 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
     | TAC_Assign_String(var, i) ->
-      (* if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
-      funRetFlag := ""; *)
+      if !funRetFlag <> "" then (stackOffset := !stackOffset + 16;);
+      funRetFlag := "";
       fprintf fout "\n\t## string provided %s\n" i;
       Hashtbl.add asm_strings i ("string" ^ string_of_int(!stringCounter));
       call_new fout "String";
