@@ -2,60 +2,6 @@
 
 open Printf
 
-type tac_instr =
-  | IConst of iconst
-  | BConst of bconst
-  | SConst of sconst 
-  | Jump of label
-  | Label of label
-  | Return of string
-  | BranchTrue of bconst * label
-  | TAC_Assign_Identifier of label * label
-  | TAC_Assign_Int of label * iconst
-  | TAC_Assign_String of label * sconst
-  | TAC_Assign_Bool of label * bconst
-  | TAC_Assign_Plus of label * tac_expr * tac_expr
-  | TAC_Assign_Minus of label * tac_expr * tac_expr
-  | TAC_Assign_Times of label * tac_expr * tac_expr
-  | TAC_Assign_Div of label * tac_expr * tac_expr
-  | TAC_Assign_Lt of label * tac_expr * tac_expr
-  | TAC_Assign_Le of label * tac_expr * tac_expr
-  | TAC_Assign_Eq of label * tac_expr * tac_expr
-  | TAC_Assign_BoolNegate of label * tac_expr
-  | TAC_Assign_ArithNegate of label * tac_expr
-  | TAC_Assign_ObjectAlloc of label * label (* might have to change to tac_expr *)
-  | TAC_Assign_ObjectDefault of label * label
-  | TAC_Assign_NullCheck of label * tac_expr
-  | TAC_Assign_Dynamic_FunctionCall of label * label * label * (tac_expr list)
-  | TAC_Assign_Static_FunctionCall of label * label * label * (tac_expr list)
-  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list)
-  | TAC_Assign_New of label * label
-  | TAC_Assign_Default of label * label
-  | TAC_Remove_Let of label
-  | TAC_Assign_Assign of label * tac_expr
-  | TAC_Branch_True of bconst * label
-  | TAC_Comment of string
-  | TAC_Label of label
-  | TAC_Jump of label
-  | TAC_Return of label
-  | TAC_Internal of label 
-and tac_expr =
-  | TAC_Variable of label
-and label = string
-and iconst = string
-and bconst = string 
-and sconst = string
-and cfg_node = {
-  label: tac_instr;
-  comment: tac_instr;
-  mutable blocks: tac_instr list;
-  mutable true_branch: cfg_node option;
-  mutable false_branch: cfg_node option;
-  mutable parent_branches: cfg_node option list;
-}
-
-let tac_expr_to_name t = match t with TAC_Variable c -> c
-
 type static_type =
   | Class of string (* ex "Int" or "Object" *)
   | SELF_TYPE of string
@@ -112,6 +58,61 @@ and exp_kind =
 
 and binding = Binding of id * cool_type * exp option
 and case_elem = Case_Elem of id * cool_type * exp
+
+type tac_instr =
+  | IConst of iconst
+  | BConst of bconst
+  | SConst of sconst 
+  | Jump of label
+  | Label of label
+  | Return of string
+  | BranchTrue of bconst * label
+  | TAC_Assign_Identifier of label * label
+  | TAC_Assign_Int of label * iconst
+  | TAC_Assign_String of label * sconst
+  | TAC_Assign_Bool of label * bconst
+  | TAC_Assign_Plus of label * tac_expr * tac_expr
+  | TAC_Assign_Minus of label * tac_expr * tac_expr
+  | TAC_Assign_Times of label * tac_expr * tac_expr
+  | TAC_Assign_Div of label * tac_expr * tac_expr
+  | TAC_Assign_Lt of label * tac_expr * tac_expr
+  | TAC_Assign_Le of label * tac_expr * tac_expr
+  | TAC_Assign_Eq of label * tac_expr * tac_expr
+  | TAC_Assign_BoolNegate of label * tac_expr
+  | TAC_Assign_ArithNegate of label * tac_expr
+  | TAC_Assign_ObjectAlloc of label * label (* might have to change to tac_expr *)
+  | TAC_Assign_ObjectDefault of label * label
+  | TAC_Assign_NullCheck of label * tac_expr
+  | TAC_Assign_Dynamic_FunctionCall of label * label * label * (tac_expr list)
+  | TAC_Assign_Static_FunctionCall of label * label * label * (tac_expr list)
+  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list)
+  | TAC_Assign_New of label * label
+  | TAC_Assign_Default of label * label
+  | TAC_Remove_Let of label
+  | TAC_Assign_Assign of label * tac_expr
+  | TAC_Branch_True of bconst * label
+  | TAC_Comment of string
+  | TAC_Label of label
+  | TAC_Jump of label
+  | TAC_Return of label
+  | TAC_Internal of label 
+  | TAC_Case of label * label * case_elem list
+and tac_expr =
+  | TAC_Variable of label
+and label = string
+and iconst = string
+and bconst = string 
+and sconst = string
+and cfg_node = {
+  label: tac_instr;
+  comment: tac_instr;
+  mutable blocks: tac_instr list;
+  mutable true_branch: cfg_node option;
+  mutable false_branch: cfg_node option;
+  mutable parent_branches: cfg_node option list;
+}
+
+let tac_expr_to_name t = match t with TAC_Variable c -> c
 let varCount = ref 0;;
 let labelCount = ref 1;;
 
@@ -720,6 +721,10 @@ let main() = (
         bodyNode.false_branch <- Some(joinNode);
         currNode := joinNode;
         [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl] @ [TAC_Assign_Default(var, "Object")], TAC_Variable(var)
+      | Case(e0, caseList) ->
+        let i, ta = convert e0.exp_kind (fresh_var ())cname mname in
+        !currNode.blocks <- !currNode.blocks @ i @ [TAC_Case(var, (tac_expr_to_name ta), caseList)];
+        i@ [TAC_Case(var, (tac_expr_to_name ta), caseList)], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -768,6 +773,11 @@ let main() = (
       max res (numTemps astelse.exp_kind)
     | While (pred, astbody) ->
       max (numTemps pred.exp_kind ) (numTemps astbody.exp_kind)
+    | Case (e0, caseList) ->
+      1+max (numTemps e0.exp_kind) (
+      List.fold_left (fun acc (Case_Elem(_, _, e)) ->
+        max acc (numTemps e.exp_kind)
+      ) 0 caseList)
     | _ -> 0
   )
   in
@@ -1279,6 +1289,14 @@ let main() = (
       stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+16);
       );
+    | TAC_Case(var, i, caseList) ->
+        if (Hashtbl.mem envtable i) then (
+            fprintf fout "\tmovq %s, %%r13\n" (Hashtbl.find envtable i);
+        ) else (
+            stackOffset := !stackOffset + 16;
+            fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
+        );
+        
     | _ -> fprintf fout ""
   )
   in
