@@ -123,6 +123,7 @@ let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
 let envtable : (string, string) Hashtbl.t = Hashtbl.create 255
 let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 
 let attrLocations : (string, string * int) Hashtbl.t = Hashtbl.create 255
+let class_tags : (string, int) Hashtbl.t = Hashtbl.create 255
 
 let main() = (
   Printexc.record_backtrace true;
@@ -796,7 +797,7 @@ let main() = (
       fprintf fout "\n\t## assign identifier %s <- %s\n" var i;
       if not (Hashtbl.mem envtable i) then (
         stackOffset := !stackOffset + 16;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset) (* TODO: broken *)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset)
       ) else ( (* move top of stack *)
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable i);
       );
@@ -965,14 +966,14 @@ let main() = (
       ) else (
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
-      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovq %%r14, %%rdi\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i1)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
         fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
-      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovq %%r15, %%rsi\n";
       fprintf fout "\tandq $-16, %%rsp\n";
       fprintf fout "\tcall lt_handler\n";
       (* fprintf fout "\taddq $16, %%rsp\n"; *)
@@ -992,14 +993,14 @@ let main() = (
       ) else (
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
-      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovq %%r14, %%rdi\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i1)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
         fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
-      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovq %%r15, %%rsi\n";
       fprintf fout "\tandq $-16, %%rsp\n";
       fprintf fout "\tcall le_handler\n";
       (* fprintf fout "\taddq $16, %%rsp\n"; *)
@@ -1019,14 +1020,14 @@ let main() = (
       ) else (
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
-      fprintf fout "\tmovl 24(%%r14), %%edi\n";
+      fprintf fout "\tmovq %%r14, %%rdi\n";
       if not(Hashtbl.mem envtable (tac_expr_to_name i2)) then (
         stackOffset := !stackOffset +16;
         fprintf fout "\tmovq %d(%%rbp), %%r15\n" !stackOffset;
       ) else (
         fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
-      fprintf fout "\tmovl 24(%%r15), %%esi\n";
+      fprintf fout "\tmovq %%r15, %%rsi\n";
       fprintf fout "\tandq $-16, %%rsp\n";
       fprintf fout "\tcall eq_handler\n";
       (* fprintf fout "\taddq $16, %%rsp\n"; *)
@@ -1073,12 +1074,6 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
       stackOffset := !stackOffset -16;
     | TAC_Assign_NullCheck(var, i) ->
-      (* if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
-      funRetFlag := ""; *) (* check if this is a tempporary, if so then delete*)
-      (* TODO later *)
-      (* if class tag is Int, String, Bool -> return Bool(false) *)
-      (* if class tag is something else, check if not initialized *)
-      (* return Bool(true) if not initialized, Bool(false) otherwise *)
       if !funRetFlag <> "" && !funRetFlag <> (tac_expr_to_name i) then (stackOffset := !stackOffset + 16; funRetFlag := "";);
       funRetFlag := "";
       fprintf fout "\n\t## isvoid\n";
@@ -1239,8 +1234,7 @@ let main() = (
         fprintf fout "\tmovq $0, %%r13\n";
       ;
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
-      (* printf "Adding var %s\n" var; *)
-      Hashtbl.add envtable var (sprintf "%d(%%rbp)"!stackOffset);
+      Hashtbl.add envtable var (sprintf "%d(%%rbp)" !stackOffset);
       stackOffset := !stackOffset -16;
     | TAC_Assign_Assign(var, i) ->
       fprintf fout "\n\n## TAC_Assign_Assign\n";
@@ -1368,7 +1362,7 @@ in
       (* create activation record *)
       fprintf aout "\tpushq %%rbp\n"; 
       fprintf aout "\tmovq %%rsp, %%rbp\n"; 
-      let ntemps =List.fold_left (fun acc (_, _, aexp) ->
+      let ntemps = List.fold_left (fun acc (_, _, aexp) ->
         match aexp with
         | Some(aexp) ->
           max acc (numTemps aexp.exp_kind);
@@ -1386,6 +1380,7 @@ in
       print_calloc aout obj_size 8;
 
       fprintf aout "\tmovq $%d, 0(%%r12)\n" i; (* class tag *)
+      Hashtbl.add class_tags cname i;
       fprintf aout "\tmovq $%d, 8(%%r12)\n" obj_size; 
       fprintf aout "\tmovq $%s..vtable, 16(%%r12)\n" cname;
 
@@ -1399,7 +1394,6 @@ in
         fprintf aout "";
       | _ -> (
         List.iteri (fun i (aname, atype, aexp) -> (
-          (* TODO: Impl Later *)
           Hashtbl.add ident_tac aname (TAC_Variable(aname));
           Hashtbl.add attrLocations cname (aname, (24+8*i));
           match aexp with 
@@ -2026,13 +2020,49 @@ in
     fprintf aout "\n## LT_HANDLER\n";
     fprintf aout ".globl lt_handler\nlt_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+
+    fprintf aout "\tjmp lt_bool\n"; (* TODO: fix string comparison *)
+
+    (* load class tags *)
+    fprintf aout "\n\t## load class tags\n";
+    fprintf aout "\tmovq 0(%%rdi), %%r13\n";
+    fprintf aout "\tmovq 0(%%rsi), %%r14\n";
+
+    (* jump to correct compare for class *)
+    fprintf aout "\n\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "Bool");
+    fprintf aout "\tje lt_bool\n";
+    fprintf aout "\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "Int");
+    fprintf aout "\tje lt_int\n";
+    fprintf aout "\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "String");
+    fprintf aout "\tje lt_string\n";
+    fprintf aout "\tjmp lt_false\n";
+
+    (* boolean, int comparisons *)
+    fprintf aout "\n\t.globl lt_bool\n\tlt_bool:\n";
+    fprintf aout "\t.globl lt_int\n\tlt_int:\n";
+    fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
     fprintf aout "\tjl lt_true\n";
+    fprintf aout "\tjmp lt_false\n";
+
+    (* string comparison *)
+    fprintf aout "\n\t.globl lt_string\n\tlt_string:\n";
+    fprintf aout "\tmovq 24(%%rdi), %%r15\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
+    fprintf aout "\tmovq %%r15, %%rsi\n";
+    fprintf aout "\tandq $-16, %%rsp\n";
+    fprintf aout "\tcall strcmp\n";
+    fprintf aout "\tcmpl $0, %%eax\n";
+    fprintf aout "\tjl lt_true\n";
+    fprintf aout "\tjmp lt_false\n";
+
+    fprintf aout "\n.globl lt_false\nlt_false:\n";
     fprintf aout "\tmovq $0, %%rax\n";
     fprintf aout "\tjmp lt_handler_end\n";
-    fprintf aout ".globl lt_true\nlt_true:\n";
+    fprintf aout "\n.globl lt_true\nlt_true:\n";
     fprintf aout "\tmovq $1, %%rax\n";
-    fprintf aout "\tjmp lt_handler_end\n";
+    fprintf aout "\n\tjmp lt_handler_end\n";
     fprintf aout ".globl lt_handler_end\nlt_handler_end:\n";
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
 
@@ -2040,31 +2070,132 @@ in
     fprintf aout "\n## LE_HANDLER\n";
     fprintf aout ".globl le_handler\nle_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+
+    fprintf aout "\tjmp le_bool\n"; (* TODO: fix string comparison *)
+
+    (* compare pointers *)
+    fprintf aout "\n\t## compare pointers\n";
+    fprintf aout "\tcmpq %%rdi, %%rsi\n";
+    fprintf aout "\tje le_true\n";
+
+    (* check if either is void -> false *)
+    (* void equality is covered by pointer check *)
+    fprintf aout "\n\t## compare void\n";
+    fprintf aout "\tcmpq $0, %%rdi\n";
+    fprintf aout "\tje le_false\n";
+    fprintf aout "\tcmpq $0, %%rsi\n";
+    fprintf aout "\tje le_false\n";
+
+    (* load class tags *)
+    fprintf aout "\n\t## load class tags\n";
+    fprintf aout "\tmovq 0(%%rdi), %%r13\n";
+    fprintf aout "\tmovq 0(%%rsi), %%r14\n";
+
+    (* jump to correct compare for class *)
+    fprintf aout "\n\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "Bool");
+    fprintf aout "\tje le_bool\n";
+    fprintf aout "\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "Int");
+    fprintf aout "\tje le_int\n";
+    fprintf aout "\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "String");
+    fprintf aout "\tje le_string\n";
+    fprintf aout "\tjmp le_false\n";
+
+    (* boolean, int comparisons *)
+    fprintf aout "\n\t.globl le_bool\n\tle_bool:\n";
+    fprintf aout "\t.globl le_int\n\tle_int:\n";
+    fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
     fprintf aout "\tjle le_true\n";
+    fprintf aout "\tjmp le_false\n";
+
+    (* string comparison *)
+    fprintf aout "\n\t.globl le_string\n";
+    fprintf aout "\tle_string:\n";
+    fprintf aout "\tmovq 24(%%rdi), %%r15\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
+    fprintf aout "\tmovq %%r15, %%rsi\n";
+    fprintf aout "\tandq $-16, %%rsp\n";
+    fprintf aout "\tcall strcmp\n";
+    fprintf aout "\tcmp $0, %%eax\n";
+    fprintf aout "\tjle le_true\n";
+    fprintf aout "\tjmp le_false\n";
+
+    fprintf aout "\n.globl le_false\nle_false:\n";
     fprintf aout "\tmovq $0, %%rax\n";
     fprintf aout "\tjmp le_handler_end\n";
-    fprintf aout ".globl le_true\nle_true:\n";
+    fprintf aout "\n.globl le_true\nle_true:\n";
     fprintf aout "\tmovq $1, %%rax\n";
-    fprintf aout "\tjmp le_handler_end\n";
+    fprintf aout "\n\tjmp le_handler_end\n";
     fprintf aout ".globl le_handler_end\nle_handler_end:\n";
-    (* call_new aout "Bool";
-    fprintf aout "\tmovq %%rax, 24(%%r13)\n"; *)
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
 
     (* print out equal handler *)
-    fprintf aout "\n## EQ_HANDLER\n";
+    fprintf aout "## EQ_HANDLER\n";
     fprintf aout ".globl eq_handler\neq_handler:\n";
-    fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+    fprintf aout "\tpushq %%rbp\n";
+    fprintf aout "\tmovq %%rsp, %%rbp\n";
+
+    (* compare pointers *)
+    fprintf aout "\n\t## compare pointers\n";
+    fprintf aout "\tcmpq %%rdi, %%rsi\n";
+    fprintf aout "\tje eq_true\n";
+
+    (* check if either is void -> false *)
+    (* void equality is covered by pointer check *)
+    fprintf aout "\n\t## compare void\n";
+    fprintf aout "\tcmpq $0, %%rdi\n";
+    fprintf aout "\tje eq_false\n";
+    fprintf aout "\tcmpq $0, %%rsi\n";
+    fprintf aout "\tje eq_false\n";
+
+    (* load class tags *)
+    fprintf aout "\n\t## load class tags\n";
+    fprintf aout "\tmovq 0(%%rdi), %%r13\n";
+    fprintf aout "\tmovq 0(%%rsi), %%r14\n";
+
+    (* jump to correct compare for class *)
+    fprintf aout "\n\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "Bool");
+    fprintf aout "\tje eq_bool\n";
+    fprintf aout "\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "Int");
+    fprintf aout "\tje eq_int\n";
+    fprintf aout "\tcmpq $%d, %%r13\n" (Hashtbl.find class_tags "String");
+    fprintf aout "\tje eq_string\n";
+    fprintf aout "\tjmp eq_false\n";
+
+    (* boolean, int comparisons *)
+    fprintf aout "\n\t.globl eq_bool\n\teq_bool:\n";
+    fprintf aout "\t.globl eq_int\n\teq_int:\n";
+    fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
     fprintf aout "\tje eq_true\n";
-    fprintf aout "\tmovq $0, %%rax\n";
-    fprintf aout "\tjmp eq_handler_end\n";
-    fprintf aout ".globl eq_true\neq_true:\n";
+    fprintf aout "\tjmp eq_false\n";
+
+    (* string comparison *)
+    fprintf aout "\n\t.globl eq_string\n";
+    fprintf aout "\teq_string:\n";
+    fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
+    fprintf aout "\tandq $-16, %%rsp\n";
+    fprintf aout "\tcall strcmp\n";
+    fprintf aout "\tcmp $0, %%eax\n";
+    fprintf aout "\tje eq_true\n";
+    fprintf aout "\tjmp eq_false\n";
+
+    (* return in %rax *)
+    fprintf aout "\n\t.globl eq_true\n\teq_true:\n";
     fprintf aout "\tmovq $1, %%rax\n";
     fprintf aout "\tjmp eq_handler_end\n";
-    fprintf aout ".globl eq_handler_end\neq_handler_end:\n";
-    fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+    fprintf aout "\n\t.globl eq_false\n\teq_false:\n";
+    fprintf aout "\tmovq $0, %%rax\n";
+    fprintf aout "\tjmp eq_handler_end\n";
+    fprintf aout "\n\t.globl eq_handler_end\n";
+    fprintf aout "\teq_handler_end:\n";
+    fprintf aout "\tmovq %%rbp, %%rsp\n";
+    fprintf aout "\tpopq %%rbp\n";
+    fprintf aout "\tret\n";
+
 
     (* print out is_void *)
     fprintf aout "\n## is_void\n";
@@ -2097,7 +2228,6 @@ in
     fprintf aout "\tandq $-16, %%rsp\n";
     fprintf aout "\tmovl $0, %%edi\n";
     fprintf aout "\tcall exit\n";
-
   )
 ) ;;
 
