@@ -1078,7 +1078,7 @@ let main() = (
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       fprintf fout "\txorq $1, %%r14\n";
       fprintf fout "\tpushq %%r14\n";
-      call_new fout "Int";
+      call_new fout "Bool";
       fprintf fout "\tpopq %%r14\n";
       fprintf fout "\tmovq %%r14, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
@@ -1102,7 +1102,7 @@ let main() = (
       fprintf fout "\tmovq %%r13, %d(%%rbp)" !stackOffset;
       stackOffset := !stackOffset -16;
     | TAC_Assign_Static_FunctionCall(var, mname, cname, args_vars) ->
-            (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
+      (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
       (* TODO: Add a VOID check for var, if caller is void then do a runtime error*)
       fprintf fout "\n\t## %s <- call %s(...) - Static Dispatch\n" var mname;
       fprintf fout "\tpushq %%r12\n";
@@ -2039,7 +2039,12 @@ in
     fprintf aout ".globl lt_handler\nlt_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
 
-    fprintf aout "\tjmp lt_bool\n"; (* TODO: fix string comparison *)
+    (* void checks *)
+    fprintf aout "\n\t## void checks\n";
+    fprintf aout "\tcmpq $0, %%rdi\n";
+    fprintf aout "\tje lt_false\n";
+    fprintf aout "\tcmpq $0, %%rsi\n";
+    fprintf aout "\tje lt_false\n";
 
     (* load class tags *)
     fprintf aout "\n\t## load class tags\n";
@@ -2058,6 +2063,8 @@ in
     (* boolean, int comparisons *)
     fprintf aout "\n\t.globl lt_bool\n\tlt_bool:\n";
     fprintf aout "\t.globl lt_int\n\tlt_int:\n";
+    fprintf aout "\tcmpq %%r13, %%r14\n"; (* ensure dynamic type matches *)
+    fprintf aout "\tjne lt_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
@@ -2066,6 +2073,8 @@ in
 
     (* string comparison *)
     fprintf aout "\n\t.globl lt_string\n\tlt_string:\n";
+    fprintf aout "\tcmpq %%r13, %%r14\n"; (* ensure dynamic type matches *)
+    fprintf aout "\tjne lt_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%r15\n";
     fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
     fprintf aout "\tmovq %%r15, %%rsi\n";
@@ -2080,8 +2089,8 @@ in
     fprintf aout "\tjmp lt_handler_end\n";
     fprintf aout "\n.globl lt_true\nlt_true:\n";
     fprintf aout "\tmovq $1, %%rax\n";
-    fprintf aout "\n\tjmp lt_handler_end\n";
-    fprintf aout ".globl lt_handler_end\nlt_handler_end:\n";
+    fprintf aout "\tjmp lt_handler_end\n";
+    fprintf aout "\n.globl lt_handler_end\nlt_handler_end:\n";
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
 
     (* print out less than or equal to handler *)
@@ -2089,16 +2098,8 @@ in
     fprintf aout ".globl le_handler\nle_handler:\n";
     fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
 
-    fprintf aout "\tjmp le_bool\n"; (* TODO: fix string comparison *)
-
-    (* compare pointers *)
-    fprintf aout "\n\t## compare pointers\n";
-    fprintf aout "\tcmpq %%rdi, %%rsi\n";
-    fprintf aout "\tje le_true\n";
-
-    (* check if either is void -> false *)
-    (* void equality is covered by pointer check *)
-    fprintf aout "\n\t## compare void\n";
+    (* void checks *)
+    fprintf aout "\n\t## void checks\n";
     fprintf aout "\tcmpq $0, %%rdi\n";
     fprintf aout "\tje le_false\n";
     fprintf aout "\tcmpq $0, %%rsi\n";
@@ -2128,8 +2129,7 @@ in
     fprintf aout "\tjmp le_false\n";
 
     (* string comparison *)
-    fprintf aout "\n\t.globl le_string\n";
-    fprintf aout "\tle_string:\n";
+    fprintf aout "\n\t.globl le_string\n\tle_string:\n";
     fprintf aout "\tmovq 24(%%rdi), %%r15\n";
     fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
     fprintf aout "\tmovq %%r15, %%rsi\n";
