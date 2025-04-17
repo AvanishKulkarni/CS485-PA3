@@ -96,7 +96,7 @@ type tac_instr =
   | TAC_Jump of label
   | TAC_Return of label
   | TAC_Internal of label 
-  | TAC_Case of label * label * case_elem list * label * label
+  | TAC_Case of label * label * case_elem list * (tac_instr list list)
 and tac_expr =
   | TAC_Variable of label
 and label = string
@@ -726,7 +726,6 @@ let main() = (
         [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl] @ [TAC_Assign_Default(var, "Object")], TAC_Variable(var)
       | Case(e0, caseList) ->
         let i, ta = convert e0.exp_kind (fresh_var ())cname mname in
-        !currNode.blocks <- !currNode.blocks @ i @ [TAC_Case(var, (tac_expr_to_name ta), caseList, cname, mname)];
         Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(e0.loc) ^ ": Exception: case on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
         Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(e0.loc) ^ 
         ": Exception: case without matching branch: "^ 
@@ -734,7 +733,17 @@ let main() = (
         "(...)\\n") ("caseErrString" ^ string_of_int(!caseErrorCounter));
         voidCounter := !voidCounter + 1;
         caseErrorCounter := !caseErrorCounter + 1;
-        i@ [TAC_Case(var, (tac_expr_to_name ta), caseList, cname, mname)], TAC_Variable(var)
+        let branchInstr = ref [] in
+        let tempNode = !currNode in
+        List.iter ( fun (Case_Elem (_, _, exp)) ->
+          let ta, _ = convert exp.exp_kind var cname mname in
+          branchInstr := !branchInstr @ [ta];
+          currNode := tempNode;
+          !currNode.true_branch <- None;
+          !currNode.false_branch <- None;
+        ) caseList;
+        !currNode.blocks <- !currNode.blocks @ i @ [TAC_Case(var, (tac_expr_to_name ta), caseList, !branchInstr)];
+        i@ [TAC_Case(var, (tac_expr_to_name ta), caseList, !branchInstr)], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -1299,7 +1308,7 @@ let main() = (
       stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+16);
       );
-    | TAC_Case(var, i, caseList, cname, mname) ->
+    | TAC_Case(var, i, caseList, tacList) ->
         if (Hashtbl.mem envtable i) then (
             fprintf fout "\tmovq %s, %%r13\n" (Hashtbl.find envtable i);
         ) else (
@@ -1469,7 +1478,7 @@ in
       Hashtbl.add class_tags cname i;
       fprintf aout "\tmovq $%d, 8(%%r12)\n" obj_size; 
       fprintf aout "\tmovq $%s..vtable, 16(%%r12)\n" cname;
-
+      Hashtbl.clear envtable;
       (* init attributes -- override for internal methods *)
       (match cname with 
       | "Bool" | "Int" -> 
@@ -1482,11 +1491,12 @@ in
         List.iteri (fun i (aname, atype, aexp) -> (
           Hashtbl.add ident_tac aname (TAC_Variable(aname));
           Hashtbl.add attrLocations cname (aname, (24+8*i));
+          Hashtbl.add envtable aname (sprintf "%d(%%r12)" (24+8*i));
           match aexp with 
           | Some(aexp) -> (
             (* parse expression *)
             fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
-            Hashtbl.clear envtable;
+            (* Hashtbl.clear envtable; *)
             let node : cfg_node = {
               label = TAC_Internal("");
               comment = TAC_Comment("");
