@@ -2301,7 +2301,7 @@ in
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
-    fprintf aout "\tjle eq_true\n";
+    fprintf aout "\tje eq_true\n";
     fprintf aout "\tjmp eq_false\n";
 
     (* int comparisons *)
@@ -2311,7 +2311,7 @@ in
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
-    fprintf aout "\tjle eq_true\n";
+    fprintf aout "\tje eq_true\n";
     fprintf aout "\tjmp eq_false\n";
 
     (* string comparison *)

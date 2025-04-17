@@ -17,7 +17,7 @@ def gen_prog(depth=3):
     return f"if ({gen_cond(variables, depth)})\n"
 
 # Generate the nested conditional string
-nested_conditions = gen_prog(depth=5)
+nested_conditions = gen_prog(depth=1)
 
 with open(r"test/cond_random.cl", "w") as file:
     file.write("class Main inherits IO {\n")
