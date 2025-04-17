@@ -1,8 +1,8 @@
 class Main inherits IO {
     main() : Object {
-        let a : G, z : Int in
+        let a : A, z : Int in
         {
-            a <- new G;
+            a <- new D;
             z <-
             case a of
                 x: B => 1;
@@ -26,3 +26,4 @@ class D inherits B {};
 class E inherits C {};
 class F inherits A {};
 class G inherits C {};
+class Z {};

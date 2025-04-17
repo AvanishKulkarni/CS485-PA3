@@ -96,7 +96,7 @@ type tac_instr =
   | TAC_Jump of label
   | TAC_Return of label
   | TAC_Internal of label 
-  | TAC_Case of label * label * case_elem list
+  | TAC_Case of label * label * case_elem list * label * label
 and tac_expr =
   | TAC_Variable of label
 and label = string
@@ -119,12 +119,15 @@ let labelCount = ref 1;;
 let stringCounter = ref 0;;
 let divCounter = ref 0;;
 let voidCounter = ref 0;;
+let caseErrorCounter = ref 0;;
 
 let vtable : ((string * string), int) Hashtbl.t = Hashtbl.create 255
 let envtable : (string, string) Hashtbl.t = Hashtbl.create 255
 let asm_strings : (string, string) Hashtbl.t = Hashtbl.create 255 
 let attrLocations : (string, string * int) Hashtbl.t = Hashtbl.create 255
 let class_tags : (string, int) Hashtbl.t = Hashtbl.create 255
+
+let inheritance : (string, string) Hashtbl.t = Hashtbl.create 255
 
 let main() = (
   Printexc.record_backtrace true;
@@ -723,8 +726,15 @@ let main() = (
         [predlbl] @ pinstr @ [bexit] @ binstr @ [jpred] @ [exitlbl] @ [TAC_Assign_Default(var, "Object")], TAC_Variable(var)
       | Case(e0, caseList) ->
         let i, ta = convert e0.exp_kind (fresh_var ())cname mname in
-        !currNode.blocks <- !currNode.blocks @ i @ [TAC_Case(var, (tac_expr_to_name ta), caseList)];
-        i@ [TAC_Case(var, (tac_expr_to_name ta), caseList)], TAC_Variable(var)
+        !currNode.blocks <- !currNode.blocks @ i @ [TAC_Case(var, (tac_expr_to_name ta), caseList, cname, mname)];
+        Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(e0.loc) ^ ": Exception: case on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
+        Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(e0.loc) ^ 
+        ": Exception: case without matching branch: "^ 
+        ((match e0.static_type with | Some(stype) -> type_to_str_clean stype | None -> "")) ^
+        "(...)\\n") ("caseErrString" ^ string_of_int(!caseErrorCounter));
+        voidCounter := !voidCounter + 1;
+        caseErrorCounter := !caseErrorCounter + 1;
+        i@ [TAC_Case(var, (tac_expr_to_name ta), caseList, cname, mname)], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
   )
   in
@@ -795,7 +805,7 @@ let main() = (
   (* reset divCounter *)
   let divCounter = (ref 0) in 
   let voidCounter = (ref 0) in
-
+  let caseErrorCounter = (ref 0) in
   (* convert TAC instructions into asm *)
   let funRetFlag = ref "" in
   let tac_to_asm fout stackOffset tac_instruction = (
@@ -1289,14 +1299,70 @@ let main() = (
       stackOffset := !stackOffset +16;
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset+16);
       );
-    | TAC_Case(var, i, caseList) ->
+    | TAC_Case(var, i, caseList, cname, mname) ->
         if (Hashtbl.mem envtable i) then (
             fprintf fout "\tmovq %s, %%r13\n" (Hashtbl.find envtable i);
         ) else (
             stackOffset := !stackOffset + 16;
             fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
         );
+        let branchLabels : (string, string) Hashtbl.t = Hashtbl.create 255 in
+        let voidLabel = fresh_label "case" "void" in
+        let branchTypes = List.map (fun (Case_Elem (_,(_,stype),_)) -> stype) caseList in
+        List.iter (fun x -> Hashtbl.add branchLabels x (fresh_label "case" x) ) branchTypes;
+        let errorLabel = fresh_label "case" "error" in
+        let endLabel = fresh_label "case" "end" in
+        let rec addLabel (tname : label) (prevLabel : label) = (
+            let nextLabel =
+            if not (List.mem tname branchTypes) then (
+                Hashtbl.add branchLabels tname prevLabel;
+                prevLabel
+            ) else (
+                Hashtbl.find branchLabels tname
+            ) in
+            List.iter ( fun x ->
+                addLabel x nextLabel;
+            ) (Hashtbl.find_all inheritance tname);
+        ) in
+        addLabel "Object" errorLabel;
         
+        (* do a void check on i *)
+        fprintf fout "\tcmpq $0, %%r13\n";
+        fprintf fout "\tje %s\n" voidLabel;
+        (* check for each class tag*)
+        fprintf fout "\tmovq 0(%%r13), %%r13\n";
+        Hashtbl.iter ( fun cname ctag ->
+            fprintf fout "\tmovq $%d, %%r14\n" ctag;
+            fprintf fout "\tcmpq %%r14, %%r13\n";
+            fprintf fout "\tje %s\n" (Hashtbl.find branchLabels cname);
+        ) class_tags;
+        (* void branch *)
+        fprintf fout ".globl %s\n%s:\n" voidLabel voidLabel;
+        fprintf fout "\tmovq $%s, %%rdi\n" ("voidErrString" ^ string_of_int(!voidCounter));
+        fprintf fout "\tandq $-16, %%rsp\n";
+        fprintf fout "\tcall cooloutstr\n";
+        fprintf fout "\tandq $-16, %%rsp\n";
+        fprintf fout "\tmovl $1, %%edi\n";
+        fprintf fout "\tcall exit\n";
+        voidCounter := !voidCounter + 1;
+        (* no matching branches *)
+        fprintf fout ".globl %s\n%s:\n" errorLabel errorLabel;
+        fprintf fout "\tmovq $%s, %%rdi\n" ("caseErrString" ^ string_of_int(!caseErrorCounter));
+        fprintf fout "\tandq $-16, %%rsp\n";
+        fprintf fout "\tcall cooloutstr\n";
+        fprintf fout "\tandq $-16, %%rsp\n";
+        fprintf fout "\tmovl $1, %%edi\n";
+        fprintf fout "\tcall exit\n";
+        caseErrorCounter := !caseErrorCounter + 1;
+        (* output code for each branch, starting from the least type first *)
+        List.iter ( fun (Case_Elem (_, (_, btype), cexp)) ->
+            fprintf fout ".globl %s\n%s:\n" (Hashtbl.find branchLabels btype) (Hashtbl.find branchLabels btype);
+            
+            fprintf fout "\tjmp %s\n" endLabel;
+        ) caseList;
+
+        fprintf fout ".globl %s\n%s:\n" endLabel endLabel;
+        (* no branches are picked, output a runtime error*)
     | _ -> fprintf fout ""
   )
   in
@@ -1353,8 +1419,10 @@ in
   Hashtbl.add asm_strings "ERROR: 0: Exception: String.substr out of range\\n" "substr.error.string";
   Hashtbl.add asm_strings "abort\\n" "abort.string";
 
-  let class_map, impl_map, _, ast = cltype in (
-
+  let class_map, impl_map, parent_map, ast = cltype in (
+    List.iter ( fun (child,parent) ->
+        Hashtbl.add inheritance parent child;
+    ) parent_map;
     (* output vtables from impl_map *)
     List.iteri (fun i (cname, methods) -> (
       fprintf aout ".globl %s..vtable\n%s..vtable:\n" cname cname;
@@ -2131,6 +2199,7 @@ in
     (* boolean comparisons *)
     fprintf aout "\n\t.globl le_bool\n\tle_bool:\n";
     fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Bool"); (* ensure dynamic type matches *)
+    fprintf aout "\tjne le_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
@@ -2140,6 +2209,7 @@ in
     (* int comparisons *)
     fprintf aout "\n\t.globl le_int\n\tle_int:\n";
     fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Int"); (* ensure dynamic type matches *)
+    fprintf aout "\tjne le_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
@@ -2149,6 +2219,7 @@ in
     (* string comparison *)
     fprintf aout "\n\t.globl le_string\n\tle_string:\n";
     fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "String"); (* ensure dynamic type matches *)
+    fprintf aout "\tjne le_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%r15\n";
     fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
     fprintf aout "\tmovq %%r15, %%rsi\n";
