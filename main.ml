@@ -832,6 +832,7 @@ let main() = (
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset)
       ) else ( (* move top of stack *)
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable i);
+        Hashtbl.add envtable var (Hashtbl.find envtable i);
       );
       
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
@@ -1487,6 +1488,7 @@ in
       fprintf aout "\tmovq $%d, 8(%%r12)\n" obj_size; 
       fprintf aout "\tmovq $%s..vtable, 16(%%r12)\n" cname;
       Hashtbl.clear envtable;
+      Hashtbl.clear ident_tac;
       (* init attributes -- override for internal methods *)
       (match cname with 
       | "Bool" | "Int" -> 
@@ -1561,11 +1563,12 @@ in
 
         (* add hashtbl offset entries for each formal, relative to %rbp *)
         Hashtbl.clear envtable;
+        Hashtbl.clear ident_tac;
         List.iter( fun (aname, loc) ->
           Hashtbl.add envtable aname (sprintf "%d(%%r12)" loc);
         ) (List.rev (Hashtbl.find_all attrLocations cname));
         List.iteri (fun i name -> 
-          fprintf aout "\t## fp[%d] = %s\n" (3+i) name;
+          fprintf aout "\t## fp[%d] = %s  %d(%%rbp)\n" (3+i) name (24+8*i);
           Hashtbl.add envtable name (sprintf "%d(%%rbp)" (24+8*i));  
         ) (formals);
         let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
