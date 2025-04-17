@@ -1118,7 +1118,7 @@ let main() = (
       fprintf fout "\tcall is_void\n";
       fprintf fout "\tpopq %%rbp\n";
       fprintf fout "\tpopq %%r12\n";
-      fprintf fout "\tmovq %%r13, %d(%%rbp)" !stackOffset;
+      fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
     | TAC_Assign_Static_FunctionCall(var, mname, cname, args_vars) ->
       (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
