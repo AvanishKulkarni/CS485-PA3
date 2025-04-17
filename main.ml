@@ -408,7 +408,7 @@ let main() = (
           [TAC_Assign_Identifier(var, (tac_expr_to_name ta))], TAC_Variable(var)
         | None -> 
           (* printf "created %s \n" name; *)
-          Hashtbl.add ident_tac name (TAC_Variable(var));
+          Hashtbl.add ident_tac name (TAC_Variable(name));
           !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, name)];
           [TAC_Assign_Identifier(var, name)], TAC_Variable(var))
       | Integer(i) ->
@@ -832,9 +832,8 @@ let main() = (
         fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset)
       ) else ( (* move top of stack *)
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable i);
-        Hashtbl.add envtable var (Hashtbl.find envtable i);
       );
-      
+      (* Hashtbl.add envtable var (sprintf "%d(%%rbp)" !stackOffset); *)
       fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
       fprintf fout "";
