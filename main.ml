@@ -497,13 +497,16 @@ let main() = (
         let retTacInstr = ref [] in
         let last_statement = List.hd (List.rev exp) in
         let rest_of_list = List.rev(List.tl (List.rev exp)) in
+        let propagateReturn = ref [] in
         List.iter( fun e ->
           let i1, ta1 = convert e.exp_kind (fresh_var()) cname mname in
-          retTacInstr := List.append !retTacInstr i1
+          retTacInstr := List.append !retTacInstr i1;
+          propagateReturn := !propagateReturn @ [TAC_Remove_Let(tac_expr_to_name ta1)];
         ) rest_of_list;
         let i1, _ = convert last_statement.exp_kind var cname mname in
         retTacInstr := List.append !retTacInstr i1;
-        (!retTacInstr), (TAC_Variable(var))
+        !currNode.blocks <- !currNode.blocks @ !propagateReturn;
+        (!retTacInstr @ !propagateReturn), (TAC_Variable(var))
       | Dynamic_Dispatch(caller, (_, mname), args) ->
         let retTacInstr = ref [] in
         let args_vars = ref [] in
