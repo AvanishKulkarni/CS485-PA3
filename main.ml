@@ -1613,82 +1613,58 @@ in
         (match cname, mname with 
         | "IO", "in_int" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\t## stack room for temporaries: 2\n";
-          fprintf aout "\tmovq $16, %%r14\n";
-          fprintf aout "\tsubq %%r14, %%rsp\n";
-          fprintf aout "\t## return address handling\n";
-          fprintf aout "\t## method body begins\n";
-          
+          fprintf aout "\tsubq $16, %%rsp\n";
 
+          call_new aout "Int";
+          fprintf aout "\tmovq %%r13, %%r14\n";
+          
           (* allocate input buffer of size 4096 *)
-          fprintf aout "\t## calloc input buffer\n";
+          fprintf aout "\n\t## calloc input buffer, store ptr in stack\n";
           fprintf aout "\tmovl $1, %%esi\n";
           fprintf aout "\tmovl $4096, %%edi\n";
           fprintf aout "\tcall calloc\n";
-          fprintf aout "\n";
+          fprintf aout "\tpushq %%rax\n";
 
           (* read input with fgets into buffer *)
-          fprintf aout "\t## read input via fgets\n";
+          fprintf aout "\n\t## read input via fgets\n";
           fprintf aout "\tmovq %%rax, %%rdi\n";
           fprintf aout "\tmovq $4096, %%rsi\n";
           fprintf aout "\tmovq stdin(%%rip), %%rdx\n";
-          fprintf aout "\n";
-          fprintf aout "\t## guarantee 16-byte alignment before call\n";
+
+          (* 16B align *)
+          fprintf aout "\n\t## guarantee 16-byte alignment before call\n";
           fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall fgets\n";
-          fprintf aout "\tmovq %%rax, %%r15\n";
-          fprintf aout "\n";
 
-          (* if fgets returns 0, jump to error handler *)
-          fprintf aout "\t## check for EOF - fgets returns NULL\n";
-          fprintf aout "\ttestq %%r15, %%r15\n";
-          fprintf aout "\tjz .in_int_error_handler\n";
-          fprintf aout "\n";
+          (* read int *)
+          fprintf aout "\n\t## read int\n";
+          fprintf aout "\tpopq %%rdi\n";
+          fprintf aout "\tmovl $0, %%eax\n";
+          fprintf aout "\tpushq %%rax\n";
+          fprintf aout "\tmovq $percent.ld, %%rsi\n";
+          fprintf aout "\tmovq %%rsp, %%rdx\n";
+          
 
           (* convert input to long with sscaf %ld *)
-          fprintf aout "\t## r15 contains the string now\n";
-          fprintf aout "\tmovq %%r15, %%rdi\n";
-          fprintf aout "\tmovq $percent.ld, %%rsi\n";
-          fprintf aout "\tmovq %%r13, %%rdx\n";
-          fprintf aout "\tmovq $0, (%%r13)\n"; (* ensure default value is 0 *)
-          fprintf aout "\n";
-          fprintf aout "\t## guarantee 16-byte alignment before call\n";
+          fprintf aout "\n\t## guarantee 16-byte alignment before call\n";
           fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall sscanf\n";
-          fprintf aout "\n";
-
-          (* if sscanf returns 0, jump to error handler *)
-          fprintf aout "\t## check if sscanf succeeded\n";
-          fprintf aout "\ttestq %%rax, %%rax\n";
-          fprintf aout "\tjz .in_int_error_handler\n";
-          fprintf aout "\n";
-
-          (* copy string into r13 *)
-          fprintf aout "\t## r13 contains the int now\n";
-          fprintf aout "\tmovq (%%r13), %%r13\n";
-          fprintf aout "\n";
+          fprintf aout "\tpopq %%rax\n";
 
           (* check overflow of 32-bit int boundaries *)
-          fprintf aout "\t## now checking overflow\n";
-          fprintf aout "\tcmpq $2147483647, %%r13\n";
-          fprintf aout "\tjg .in_int_error_handler\n";
-          fprintf aout "\tcmpq $-2147483648, %%r13\n";
-          fprintf aout "\tjl .in_int_error_handler\n";
-          fprintf aout "\tjmp .in_int_end\n";
-          fprintf aout "\n";
+          fprintf aout "\n\t## check overflow\n";
+          fprintf aout "\tmovq $0, %%rsi\n";
+          fprintf aout "\tcmpq $2147483647, %%r15\n";
+          fprintf aout "\tcmovg %%rsi, %%rax\n";
+          fprintf aout "\tcmpq $-2147483648, %%r15\n";
+          fprintf aout "\tcmovl %%rsi, %%rax\n";
 
-          (* if any error, set result to 0 *)
-          fprintf aout ".in_int_error_handler:\n";
-          fprintf aout "\tmovq $0, %%r13\n";
-          fprintf aout "\n";
-          fprintf aout ".in_int_end:\n";
+          fprintf aout "\n.in_int_end:\n";
           fprintf aout "\t## store int into Int()\n";
-          fprintf aout "\tmovq %%r13, %%r14\n";
-          fprintf aout "\tpushq %%r14\n";
-          call_new aout "Int";
-          fprintf aout "\tpopq %%r14\n";
-          fprintf aout "\tmovq %%r14, 24(%%r13)\n";
-          (* fprintf aout "\tmovq %%r14, %%r13\n"; *)
+          fprintf aout "\tmovq %%rax, %%r13\n";
+          fprintf aout "\tmovq %%r13, 24(%%r14)\n";
+          fprintf aout "\tmovq %%r14, %%r13\n";
+          
         )
         | "IO", "in_string" -> (
           fprintf aout "\tsubq $16, %%rsp\n";
