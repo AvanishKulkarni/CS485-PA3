@@ -1694,9 +1694,10 @@ in
           fprintf aout "\tsubq $16, %%rsp\n";
           call_new aout "String";
           fprintf aout "\tmovq %%r13, %%r14\n";
+          fprintf aout "\tpushq %%r14\n";
           fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall coolgetstr\n";
-          fprintf aout "\tmovq %%rax, %%r13\n";
+          fprintf aout "\tpopq %%r14\n";
           fprintf aout "\tmovq %%r13, 24(%%r14)\n";
           fprintf aout "\tmovq %%r14, %%r13\n";
         )
