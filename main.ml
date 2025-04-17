@@ -1618,8 +1618,7 @@ in
           fprintf aout "\tsubq %%r14, %%rsp\n";
           fprintf aout "\t## return address handling\n";
           fprintf aout "\t## method body begins\n";
-          call_new aout "Int";
-          fprintf aout "\tmovq %%r13, %%r14\n";
+          
 
           (* allocate input buffer of size 4096 *)
           fprintf aout "\t## calloc input buffer\n";
@@ -1684,8 +1683,12 @@ in
           fprintf aout "\n";
           fprintf aout ".in_int_end:\n";
           fprintf aout "\t## store int into Int()\n";
-          fprintf aout "\tmovq %%r13, 24(%%r14)\n";
-          fprintf aout "\tmovq %%r14, %%r13\n";
+          fprintf aout "\tmovq %%r13, %%r14\n";
+          fprintf aout "\tpushq %%r14\n";
+          call_new aout "Int";
+          fprintf aout "\tpopq %%r14\n";
+          fprintf aout "\tmovq %%r14, 24(%%r13)\n";
+          (* fprintf aout "\tmovq %%r14, %%r13\n"; *)
         )
         | "IO", "in_string" -> (
           fprintf aout "\tsubq $16, %%rsp\n";
