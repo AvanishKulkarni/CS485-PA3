@@ -817,7 +817,7 @@ let main() = (
   let caseErrorCounter = (ref 0) in
   (* convert TAC instructions into asm *)
   let funRetFlag = ref "" in
-  let tac_to_asm fout stackOffset tac_instruction = (
+  let rec tac_to_asm fout stackOffset tac_instruction = (
     match tac_instruction with
     | TAC_Assign_Identifier(var, i) ->
       (* printf "Searching for var %s\n" var; *)
@@ -1364,12 +1364,17 @@ let main() = (
         fprintf fout "\tcall exit\n";
         caseErrorCounter := !caseErrorCounter + 1;
         (* output code for each branch, starting from the least type first *)
-        List.iter ( fun (Case_Elem (_, (_, btype), cexp)) ->
+        List.iter2 ( fun (Case_Elem (_, (_, btype), cexp)) tacs->
             fprintf fout ".globl %s\n%s:\n" (Hashtbl.find branchLabels btype) (Hashtbl.find branchLabels btype);
-            
+            let tacOffset = ref !stackOffset in
+            List.iter ( fun x ->
+              tac_to_asm fout tacOffset x;
+            ) tacs;
+            fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!tacOffset + 16);
+            fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset);
             fprintf fout "\tjmp %s\n" endLabel;
-        ) caseList;
-
+        ) caseList tacList;
+        stackOffset := !stackOffset -16;
         fprintf fout ".globl %s\n%s:\n" endLabel endLabel;
         (* no branches are picked, output a runtime error*)
     | _ -> fprintf fout ""

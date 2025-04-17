@@ -54,7 +54,7 @@ class Main inherits IO {
             x <- in_int();
             y <- in_int();
             z <- in_int();
-            (* if (((~((r + p)) + (~(l) + (m * m))) + ~((~(g) * ~(m)))) < ~(((~(x) + (z + o)) + ((x * t) * ~(j))))) then
+            if (((~((r + p)) + (~(l) + (m * m))) + ~((~(g) * ~(m)))) < ~(((~(x) + (z + o)) + ((x * t) * ~(j))))) then
                     if (((~((r + p)) + (~(l) + (m * m))) + ~((~(g) * ~(m)))) < ~(((~(x) + (z + o)) + ((x * t) * ~(j))))) then
                         if (((~((r + p)) + (~(l) + (m * m))) + ~((~(g) * ~(m)))) < ~(((~(x) + (z + o)) + ((x * t) * ~(j))))) then
                         out_int(2500)
@@ -132,7 +132,7 @@ class Main inherits IO {
                     fi
                     fi                
                     fi
-            fi; *)
+            fi;
             if (((~((r + p)) + (~(l) + (m * m))) + ~((~(g) * ~(m)))) < ~(((~(x) + (z + o)) + ((x * t) * ~(j))))) then
                 out_int(2500)
             else
