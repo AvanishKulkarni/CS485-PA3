@@ -2060,10 +2060,19 @@ in
     fprintf aout "\tje lt_string\n";
     fprintf aout "\tjmp lt_false\n";
 
-    (* boolean, int comparisons *)
+    (* boolean comparisons *)
     fprintf aout "\n\t.globl lt_bool\n\tlt_bool:\n";
-    fprintf aout "\t.globl lt_int\n\tlt_int:\n";
-    fprintf aout "\tcmpq %%r13, %%r14\n"; (* ensure dynamic type matches *)
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Bool"); (* ensure dynamic type matches *)
+    fprintf aout "\tjne lt_false\n";
+    fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
+    fprintf aout "\tcmpl %%edi, %%esi\n";
+    fprintf aout "\tjl lt_true\n";
+    fprintf aout "\tjmp lt_false\n";
+
+    (* int comparisons *)
+    fprintf aout "\n\t.globl lt_int\n\tlt_int:\n";
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Int"); (* ensure dynamic type matches *)
     fprintf aout "\tjne lt_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
@@ -2073,7 +2082,7 @@ in
 
     (* string comparison *)
     fprintf aout "\n\t.globl lt_string\n\tlt_string:\n";
-    fprintf aout "\tcmpq %%r13, %%r14\n"; (* ensure dynamic type matches *)
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "String"); (* ensure dynamic type matches *)
     fprintf aout "\tjne lt_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%r15\n";
     fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
@@ -2119,9 +2128,18 @@ in
     fprintf aout "\tje le_string\n";
     fprintf aout "\tjmp le_false\n";
 
-    (* boolean, int comparisons *)
+    (* boolean comparisons *)
     fprintf aout "\n\t.globl le_bool\n\tle_bool:\n";
-    fprintf aout "\t.globl le_int\n\tle_int:\n";
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Bool"); (* ensure dynamic type matches *)
+    fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
+    fprintf aout "\tcmpl %%edi, %%esi\n";
+    fprintf aout "\tjle le_true\n";
+    fprintf aout "\tjmp le_false\n";
+
+    (* int comparisons *)
+    fprintf aout "\n\t.globl le_int\n\tle_int:\n";
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Int"); (* ensure dynamic type matches *)
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
@@ -2130,6 +2148,7 @@ in
 
     (* string comparison *)
     fprintf aout "\n\t.globl le_string\n\tle_string:\n";
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "String"); (* ensure dynamic type matches *)
     fprintf aout "\tmovq 24(%%rdi), %%r15\n";
     fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
     fprintf aout "\tmovq %%r15, %%rsi\n";
