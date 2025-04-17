@@ -2148,7 +2148,7 @@ in
 
     (* boolean comparisons *)
     fprintf aout "\n\t.globl lt_bool\n\tlt_bool:\n";
-    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Bool"); (* ensure dynamic type matches *)
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Bool");
     fprintf aout "\tjne lt_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
@@ -2158,7 +2158,7 @@ in
 
     (* int comparisons *)
     fprintf aout "\n\t.globl lt_int\n\tlt_int:\n";
-    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Int"); (* ensure dynamic type matches *)
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Int"); 
     fprintf aout "\tjne lt_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
@@ -2168,7 +2168,7 @@ in
 
     (* string comparison *)
     fprintf aout "\n\t.globl lt_string\n\tlt_string:\n";
-    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "String"); (* ensure dynamic type matches *)
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "String");
     fprintf aout "\tjne lt_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%r15\n";
     fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
@@ -2200,6 +2200,11 @@ in
     fprintf aout "\tcmpq $0, %%rsi\n";
     fprintf aout "\tje le_false\n";
 
+    (* compare pointers *)
+    fprintf aout "\n\t## compare pointers\n";
+    fprintf aout "\tcmpq %%rdi, %%rsi\n";
+    fprintf aout "\tje le_true\n";
+
     (* load class tags *)
     fprintf aout "\n\t## load class tags\n";
     fprintf aout "\tmovq 0(%%rdi), %%r13\n";
@@ -2216,7 +2221,7 @@ in
 
     (* boolean comparisons *)
     fprintf aout "\n\t.globl le_bool\n\tle_bool:\n";
-    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Bool"); (* ensure dynamic type matches *)
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Bool");
     fprintf aout "\tjne le_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
@@ -2226,7 +2231,7 @@ in
 
     (* int comparisons *)
     fprintf aout "\n\t.globl le_int\n\tle_int:\n";
-    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Int"); (* ensure dynamic type matches *)
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Int");
     fprintf aout "\tjne le_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
@@ -2236,7 +2241,7 @@ in
 
     (* string comparison *)
     fprintf aout "\n\t.globl le_string\n\tle_string:\n";
-    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "String"); (* ensure dynamic type matches *)
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "String");
     fprintf aout "\tjne le_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%r15\n";
     fprintf aout "\tmovq 24(%%rsi), %%rdi\n";
@@ -2289,18 +2294,31 @@ in
     fprintf aout "\tje eq_string\n";
     fprintf aout "\tjmp eq_false\n";
 
-    (* boolean, int comparisons *)
+    (* boolean comparisons *)
     fprintf aout "\n\t.globl eq_bool\n\teq_bool:\n";
-    fprintf aout "\t.globl eq_int\n\teq_int:\n";
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Bool");
+    fprintf aout "\tjne eq_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tcmpl %%edi, %%esi\n";
-    fprintf aout "\tje eq_true\n";
+    fprintf aout "\tjle eq_true\n";
+    fprintf aout "\tjmp eq_false\n";
+
+    (* int comparisons *)
+    fprintf aout "\n\t.globl eq_int\n\teq_int:\n";
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "Int");
+    fprintf aout "\tjne eq_false\n";
+    fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
+    fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
+    fprintf aout "\tcmpl %%edi, %%esi\n";
+    fprintf aout "\tjle eq_true\n";
     fprintf aout "\tjmp eq_false\n";
 
     (* string comparison *)
     fprintf aout "\n\t.globl eq_string\n";
     fprintf aout "\teq_string:\n";
+    fprintf aout "\tcmpq $%d, %%r14\n" (Hashtbl.find class_tags "String");
+    fprintf aout "\tjne eq_false\n";
     fprintf aout "\tmovq 24(%%rdi), %%rdi\n";
     fprintf aout "\tmovq 24(%%rsi), %%rsi\n";
     fprintf aout "\tandq $-16, %%rsp\n";
