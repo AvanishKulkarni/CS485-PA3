@@ -1,29 +1,29 @@
 #!/bin/bash
 if [ main.ml -nt main ]; then
-    ocamlopt main.ml -o main 
+    ocamlopt main.ml -g -o main 
 fi
 count=0
 total=0
 function run_tests() {
-    rm -f *.cl-tac
+    rm -f *.s
     rm -f *.cl-type
-    rm -f cp1/*.cl-tac
+    rm -f cp1/*.s
     rm -f cp1/*.cl-type
     rm -f reference_error.txt
     rm -f test_error.txt
     rm -f reference_output.txt
     rm -f test_output.txt
-    cool --type "$1"
-    ./main "$1-type" > test_error.txt
-    cool "$1" --tac --out temp_ref > reference_error.txt
-
-    if [ -f "temp_ref.cl-tac" ]; then
-        if [ -f "$1-input" ]; then
-            cool temp_ref.cl-tac < "$1-input" > reference_output.txt
-            cool "$1-tac" < "$1-input" > test_output.txt
+    cool --type "$1.cl"
+    ./main "$1.cl-type" > test_error.txt
+    cool "$1.cl" > reference_error.txt
+    if [ -f "$1.s" ]; then
+        gcc --no-pie --static "$1.s"
+        if [ -f "$1.cl-input" ]; then
+            cool "$1.cl" < "$1.cl-input" > reference_output.txt
+            ./a.out < "$1.cl-input" > test_output.txt
         else
-            cool temp_ref.cl-tac > reference_output.txt
-            cool "$1-tac" > test_output.txt
+            cool "$1.cl" > reference_output.txt
+            ./a.out > test_output.txt
         fi
         diff -b -B -w reference_output.txt test_output.txt > /dev/null
         # diff -b -B -w temp_ref.cl-tac "$1-tac" > /dev/null
@@ -39,21 +39,43 @@ function run_tests() {
     fi
 }
 
-rm -f cp1/*.cl-tac
+rm -f cp1/*.s
 rm -f cp1/*.cl-type
 
 if [ -n "$1" ]; then 
-    run_tests $1
-    cool --type "$1"
-    echo "Our Output"
-    ./main "$1-type"
-    echo "Referenced Compiler"
-    cool --tac "$1" --out temp_ref
+    input=$1
+    fname="${input%.*}"
+    run_tests $fname
+    if [ -e "$fname.cl-input" ]; then 
+        echo "our output:"
+        ./a.out < "$fname.cl-input"
+        echo
+        echo "cool ref output:"
+        cool "$fname.cl" < "$fname.cl-input"
+        echo
+    else 
+        echo "our output:"
+        ./a.out
+        echo
+        echo "cool ref output:"
+        cool "$fname.cl"
+        echo
+    fi
 else
-    
     for file in cp1/*; do
-        if [[ $file == *.cl ]]; then 
-            if run_tests $file; then
+        if [[ $file == *.cl ]]; then
+            fname="${input%.*}"
+            if run_tests $fname; then
+                count=$((count + 1))
+            fi
+            total=$((total + 1))
+            echo ""
+        fi
+    done
+    for file in c3/*; do
+        if [[ $file == *.cl ]]; then
+            fname="${input%.*}"
+            if run_tests $fname; then
                 count=$((count + 1))
             fi
             total=$((total + 1))
