@@ -5,7 +5,12 @@ class Main inherits IO {
             a <- new D;
             z <-
             case a of
-                x: B => 1;
+                x: B => {
+                x <- new B;
+                case x of 
+                    a: Object => 10;
+                esac;
+                };
                 y: C => 2;
                 z: E => 3;
                 b: F => 4;
