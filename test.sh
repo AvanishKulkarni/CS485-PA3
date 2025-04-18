@@ -13,6 +13,7 @@ function run_tests() {
     rm -f test_output.txt
     
     cool --type "$1.cl"
+    cool --out "$1"_ref --x86 "$1.cl"
     
     ./main "$1.cl-type" > test_error.txt
     if [ -f "$1.s" ]; then
