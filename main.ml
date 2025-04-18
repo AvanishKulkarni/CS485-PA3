@@ -576,7 +576,8 @@ let main() = (
                 Hashtbl.add ident_tac vname (TAC_Variable(var));
                 let i, ta = convert binit.exp_kind (var) cname mname in
                 retTacInstr := List.append !retTacInstr [TAC_Assign_Assign(var, ta)];
-                let_vars := List.append !let_vars [ta];
+                !currNode.blocks <- !currNode.blocks @ [TAC_Assign_Identifier(var, tac_expr_to_name ta)];
+                let_vars := List.append !let_vars [TAC_Variable(var)];
                 removeScope := List.append !removeScope [TAC_Remove_Let(var)];
               (* [Let-No-Init] *)
               | None -> 
@@ -829,7 +830,8 @@ let main() = (
       fprintf fout "\n\t## assign identifier %s <- %s\n" var i;
       if not (Hashtbl.mem envtable i) then (
         stackOffset := !stackOffset + 16;
-        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset)
+        fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset);
+        Hashtbl.add envtable var (sprintf "%d(%%rbp)" !stackOffset);
       ) else ( (* move top of stack *)
         fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable i);
       );
