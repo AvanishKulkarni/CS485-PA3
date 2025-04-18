@@ -1503,6 +1503,18 @@ in
           Hashtbl.add ident_tac aname (TAC_Variable(aname));
           Hashtbl.add attrLocations cname (aname, (24+8*i));
           Hashtbl.add envtable aname (sprintf "%d(%%r12)" (24+8*i));
+
+          (* set up default initialization *)
+          fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
+          match atype with
+          | "Bool" | "Int" | "String" ->
+            call_new aout atype;
+            fprintf aout "\tmovq %%r13, %d(%%r12)\n" (24+8*i);
+          | _ ->
+            fprintf aout "\tmovq $0, %d(%%r12)\n" (24+8*i);
+        )) attrs;
+
+        List.iteri (fun i (aname, atype, aexp) -> (
           match aexp with 
           | Some(aexp) -> (
             (* parse expression *)
@@ -1518,8 +1530,7 @@ in
             }
             in
             currNode := node;
-            visitedNodes := [];
-            (* TODO find the AST for the method and then run it *)      
+            visitedNodes := [];  
             let _, _ = convert aexp.exp_kind (fresh_var()) cname aname in
             let stackOffset = ref 0 in
             output_asm aout stackOffset (Some(node));
@@ -1527,14 +1538,7 @@ in
             fprintf aout "\tmovq %%r14, %d(%%r12)\n" (24+8*i);
           )
           | None -> (
-            (* default initialization *)
-            fprintf aout "\t## self[%d] = %s: %s\n" (3+i) cname aname;
-            match atype with
-            | "Bool" | "Int" | "String" ->
-              call_new aout atype;
-              fprintf aout "\tmovq %%r13, %d(%%r12)\n" (24+8*i);
-            | _ ->
-              fprintf aout "\tmovq $0, %d(%%r12)\n" (24+8*i);
+            (* do nothing since already default initialized *)
           )
         )) attrs;
       ));
