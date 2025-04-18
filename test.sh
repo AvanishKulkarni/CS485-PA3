@@ -5,20 +5,19 @@ fi
 count=0
 total=0
 function run_tests() {
-    rm -f *.s
-    rm -f *.cl-type
-    rm -f cp1/*.s
-    rm -f cp1/*.cl-type
+    rm -f "$1".s
+    rm -f "$1".cl-type
     rm -f reference_error.txt
     rm -f test_error.txt
     rm -f reference_output.txt
     rm -f test_output.txt
+    
     cool --type "$1.cl"
+    
     ./main "$1.cl-type" > test_error.txt
-    cool "$1.cl" > reference_error.txt
     if [ -f "$1.s" ]; then
         gcc --no-pie --static "$1.s"
-        if [ -f "$1.cl-input" ]; then
+        if [ -e "$1.cl-input" ]; then
             cool "$1.cl" < "$1.cl-input" > reference_output.txt
             ./a.out < "$1.cl-input" > test_output.txt
         else
