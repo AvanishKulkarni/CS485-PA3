@@ -64,7 +64,7 @@ if [ -n "$1" ]; then
 else
     for file in cp1/*; do
         if [[ $file == *.cl ]]; then
-            fname="${input%.*}"
+            fname="${file%.*}"
             if run_tests $fname; then
                 count=$((count + 1))
             fi
@@ -74,7 +74,7 @@ else
     done
     for file in c3/*; do
         if [[ $file == *.cl ]]; then
-            fname="${input%.*}"
+            fname="${file%.*}"
             if run_tests $fname; then
                 count=$((count + 1))
             fi
