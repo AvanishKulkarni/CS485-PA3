@@ -1582,10 +1582,12 @@ in
         Hashtbl.clear ident_tac;
         List.iter( fun (aname, loc) ->
           Hashtbl.add envtable aname (sprintf "%d(%%r12)" loc);
+          Hashtbl.add ident_tac aname (TAC_Variable(aname));
         ) (List.rev (Hashtbl.find_all attrLocations cname));
         List.iteri (fun i name -> 
           fprintf aout "\t## fp[%d] = %s  %d(%%rbp)\n" (3+i) name (24+8*i);
           Hashtbl.add envtable name (sprintf "%d(%%rbp)" (24+8*i));  
+          Hashtbl.add ident_tac name (TAC_Variable(name));
         ) (formals);
         let ntemps = numTemps body.exp_kind + 1 in (* Adding 1 as assuming the return value is in a temporary*)
         fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
