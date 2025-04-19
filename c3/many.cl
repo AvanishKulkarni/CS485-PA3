@@ -31,7 +31,7 @@ class Main inherits IO {
         -- Deeply nested, recursive-style madness, no actual recursion though
         let no_binds : Int in
           {
-            x <- in_int();  --10
+            x <- 10;  --10
             y <- x + 1; -- 11
             z <- y * 3; -- 33
             a <- z - x; -- 23

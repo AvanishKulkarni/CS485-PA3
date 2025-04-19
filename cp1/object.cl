@@ -19,7 +19,7 @@ class Main inherits IO {
     };
 };
 
-class A inherits IO{
+class A inherits IO {
     a : Int <- 52;
     b : String;
     c: B;
