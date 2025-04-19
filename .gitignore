@@ -1,4 +1,5 @@
-*.cl-*
+*.cl-type
+*.cl-tac
 *.dot
 *.s
 wip/*
