@@ -830,6 +830,7 @@ let main() = (
   let divCounter = (ref 0) in 
   let voidCounter = (ref 0) in
   let caseErrorCounter = (ref 0) in
+
   (* convert TAC instructions into asm *)
   let rec tac_to_asm fout stackOffset tac_instruction = (
     match tac_instruction with
@@ -1149,7 +1150,7 @@ let main() = (
       fprintf fout "\n\t## %s <- call %s(...) - Dynamic Dispatch\n" var mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
-      stackOffset := !stackOffset + 16; (* caller object is on top of the stack*)
+      stackOffset := !stackOffset + 16; (* caller object is on top of the stack *)
       fprintf fout "\tmovq %d(%%rbp), %%r12\n" (!stackOffset);
 
       (* void check *)
@@ -1515,6 +1516,7 @@ in
         (* add hashtbl offset entries for each formal, relative to %rbp *)
         Hashtbl.clear envtable;
         Hashtbl.clear ident_tac;
+        Hashtbl.add envtable "self" "%r12";
         List.iter( fun (aname, loc) ->
           Hashtbl.add envtable aname (sprintf "%d(%%r12)" loc);
           Hashtbl.add ident_tac aname (TAC_Variable(aname));
@@ -1610,9 +1612,9 @@ in
           (* check overflow of 32-bit int boundaries *)
           fprintf aout "\n\t## check overflow\n";
           fprintf aout "\tmovq $0, %%rsi\n";
-          fprintf aout "\tcmpq $2147483647, %%r15\n";
+          fprintf aout "\tcmpq $2147483647, %%rax\n";
           fprintf aout "\tcmovg %%rsi, %%rax\n";
-          fprintf aout "\tcmpq $-2147483648, %%r15\n";
+          fprintf aout "\tcmpq $-2147483648, %%rax\n";
           fprintf aout "\tcmovl %%rsi, %%rax\n";
 
           fprintf aout "\n.in_int_end:\n";
