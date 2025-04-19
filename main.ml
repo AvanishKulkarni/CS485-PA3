@@ -1669,14 +1669,18 @@ in
         | "Object", "copy" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
           fprintf aout "\tsubq $16, %%rsp\n";
+
           fprintf aout "\tmovq 8(%%r12), %%r14\n";
-          fprintf aout "\tandq $-16, %%rsp\n";
+          
           fprintf aout "\tmovq $8, %%rsi\n";
           fprintf aout "\tmovq %%r14, %%rdi\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
+          fprintf aout "\tcall calloc\n";
           fprintf aout "\tmovq %%rax, %%r13\n";
           fprintf aout "\tpushq %%r13\n";
-          fprintf aout ".globl l1\n";
-          fprintf aout "l1:\n";
+
+          (* copy loop *)
+          fprintf aout ".globl l1\nl1:\n";
           fprintf aout "\tcmpq $0, %%r14\n";
           fprintf aout "\tje l2\n";
           fprintf aout "\tmovq 0(%%r12), %%r15\n";
@@ -1687,8 +1691,9 @@ in
           fprintf aout "\tmovq $1, %%r15\n";
           fprintf aout "\tsubq %%r15, %%r14\n";
           fprintf aout "\tjmp l1\n";
-          fprintf aout ".globl l2\n";
-          fprintf aout "l2:\n";
+          fprintf aout ".globl l2\nl2:\n";
+          
+          (* done with copy loop *)
           fprintf aout "\tpopq %%r13\n";
         )
         | "Object", "type_name" -> (
