@@ -739,13 +739,24 @@ let main() = (
         caseErrorCounter := !caseErrorCounter + 1;
         let branchInstr = ref [] in
         let tempNode = !currNode in
-        List.iter ( fun (Case_Elem (_, _, exp)) ->
+        List.iter ( fun (Case_Elem ((_, bname), _, exp)) ->
+          currNode := {
+          label = TAC_Label("None");
+          comment = TAC_Comment("None");
+          blocks = [];
+          true_branch = None;
+          false_branch = None;
+          parent_branches = [];
+        };
+          Hashtbl.add ident_tac bname (TAC_Variable(fresh_var()));
           let ta, _ = convert exp.exp_kind var cname mname in
+          Hashtbl.remove ident_tac bname;
           branchInstr := !branchInstr @ [ta];
           currNode := tempNode;
           !currNode.true_branch <- None;
           !currNode.false_branch <- None;
         ) caseList;
+        
         !currNode.blocks <- !currNode.blocks @ i @ [TAC_Case(var, (tac_expr_to_name ta), caseList, !branchInstr)];
         i@ [TAC_Case(var, (tac_expr_to_name ta), caseList, !branchInstr)], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
