@@ -1437,6 +1437,7 @@ in
       fprintf aout "\tmovq $%s..vtable, 16(%%r12)\n" cname;
       Hashtbl.clear envtable;
       Hashtbl.clear ident_tac;
+      Hashtbl.add envtable "self" "%r12";
       (* init attributes -- override for internal methods *)
       (match cname with 
       | "Bool" | "Int" -> 
