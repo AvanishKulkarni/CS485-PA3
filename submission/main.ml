@@ -687,7 +687,7 @@ let main() = (
           false_branch = None;
           parent_branches = [Some(prevNode)];
         };
-        
+        prevNode.true_branch <- Some(!currNode);
         let pinstr, pexp = convert pred.exp_kind predvar cname mname in 
         (* let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in *) 
         let bexit = TAC_Branch_True(notpredvar, exitlblname) in 
@@ -695,7 +695,7 @@ let main() = (
         let predNode = !currNode in
         (* append predicate to currNode *)
         (* !currNode.blocks <- !currNode.blocks @ [predlbl] @ pinstr @ [notpred] @ [bexit]; *)
-        prevNode.true_branch <- Some(predNode);
+        
         (* body node *)
         let bodycomm = TAC_Comment("while-body") in
         currNode := {
@@ -1478,11 +1478,12 @@ in
             }
             in
             currNode := node;
-            visitedNodes := [];  
-            let _, _ = convert aexp.exp_kind (fresh_var()) cname aname in
+            visitedNodes := [];
+            let _, _ = convert aexp.exp_kind (fresh_var()) cname (sprintf "attr_%s" aname) in
             let stackOffset = ref 0 in
             output_asm aout stackOffset (Some(node));
-            fprintf aout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+16);
+            let stackOffset = if (!stackOffset = 0) then 0 else !stackOffset+16 in
+            fprintf aout "\tmovq %d(%%rbp), %%r14\n" stackOffset;
             fprintf aout "\tmovq %%r14, %d(%%r12)\n" (24+8*i);
           )
           | None -> (
@@ -1541,11 +1542,13 @@ in
         in
         currNode := node;
         visitedNodes := [];
+        labelCount := 1;
         (* TODO find the AST for the method and then run it *)      
         let _, _ = convert body.exp_kind (fresh_var()) cname mname in
         let stackOffset = ref 0 in
         output_asm aout stackOffset (Some(node));
-        fprintf aout "\tmovq %d(%%rbp), %%r13\n" 0;
+        let stackOffset = if (!stackOffset = 0) then 0 else !stackOffset+16 in
+        fprintf aout "\tmovq %d(%%rbp), %%r13\n" stackOffset;
         fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
       )) non_inherited_methods;
     )) user_impl_map;
