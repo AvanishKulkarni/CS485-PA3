@@ -1545,7 +1545,7 @@ in
         let _, _ = convert body.exp_kind (fresh_var()) cname mname in
         let stackOffset = ref 0 in
         output_asm aout stackOffset (Some(node));
-        fprintf aout "\tmovq %d(%%rbp), %%r13\n" (!stackOffset + 16);
+        fprintf aout "\tmovq %d(%%rbp), %%r13\n" 0;
         fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
       )) non_inherited_methods;
     )) user_impl_map;
