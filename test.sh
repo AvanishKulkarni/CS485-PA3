@@ -5,8 +5,10 @@ fi
 count=0
 total=0
 function run_tests() {
-    rm -f "$1.s"
-    rm -f "$1.cl-type"
+    rm -f cp1/*.s
+    rm -f cp1/*.cl-type
+    rm -f c3/*.s
+    rm -f c3/*.cl-type
     rm -f reference_error.txt
     rm -f test_error.txt
     rm -f reference_output.txt
@@ -41,7 +43,8 @@ function run_tests() {
 
 rm -f cp1/*.s
 rm -f cp1/*.cl-type
-
+rm -f c3/*.s
+rm -f c3/*.cl-type
 if [ -n "$1" ]; then 
     input=$1
     fname="${input%.*}"
