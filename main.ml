@@ -1482,7 +1482,8 @@ in
             let _, _ = convert aexp.exp_kind (fresh_var()) cname aname in
             let stackOffset = ref 0 in
             output_asm aout stackOffset (Some(node));
-            fprintf aout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset+16);
+            let stackOffset = if (!stackOffset = 0) then 0 else !stackOffset+16 in
+            fprintf aout "\tmovq %d(%%rbp), %%r14\n" stackOffset;
             fprintf aout "\tmovq %%r14, %d(%%r12)\n" (24+8*i);
           )
           | None -> (
@@ -1545,7 +1546,8 @@ in
         let _, _ = convert body.exp_kind (fresh_var()) cname mname in
         let stackOffset = ref 0 in
         output_asm aout stackOffset (Some(node));
-        fprintf aout "\tmovq %d(%%rbp), %%r13\n" 0;
+        let stackOffset = if (!stackOffset = 0) then 0 else !stackOffset+16 in
+        fprintf aout "\tmovq %d(%%rbp), %%r13\n" stackOffset;
         fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
       )) non_inherited_methods;
     )) user_impl_map;
