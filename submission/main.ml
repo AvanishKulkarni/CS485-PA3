@@ -395,6 +395,7 @@ let main() = (
     | None -> ();
   )
     in
+  let caseBranchType = ref "" in
   let ident_tac : (name, (tac_expr)) Hashtbl.t = Hashtbl.create 255 in
   let rec convert (a: exp_kind) (var : name) (cname: name) (mname: name) : (tac_instr list * tac_expr) = (
     match a with
@@ -525,11 +526,19 @@ let main() = (
             | "SELF_TYPE" -> cname
             | _ -> callerType
         in
-        let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, callerType, !args_vars) in
-        Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(caller.loc) ^ ": Exception: dispatch on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
-        voidCounter := !voidCounter + 1;
-        !currNode.blocks <- !currNode.blocks @ [to_output];
-        (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
+        if !caseBranchType = "" then (
+          let to_output = TAC_Assign_Dynamic_FunctionCall(var, mname, callerType, !args_vars) in
+          Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(caller.loc) ^ ": Exception: dispatch on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
+          voidCounter := !voidCounter + 1;
+          !currNode.blocks <- !currNode.blocks @ [to_output];
+          (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
+        ) else (
+          let to_output = TAC_Assign_Static_FunctionCall(var, mname, !caseBranchType, !args_vars) in
+          Hashtbl.add asm_strings ("ERROR: " ^ string_of_int(caller.loc) ^ ": Exception: dispatch on void\\n") ("voidErrString" ^ string_of_int(!voidCounter));
+          voidCounter := !voidCounter + 1;
+          !currNode.blocks <- !currNode.blocks @ [to_output];
+          (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
+        )
       | Self_Dispatch((_,mname), args) -> 
         let retTacInstr = ref [] in
         let args_vars = ref [] in
@@ -739,7 +748,7 @@ let main() = (
         caseErrorCounter := !caseErrorCounter + 1;
         let branchInstr = ref [] in
         let tempNode = !currNode in
-        List.iter ( fun (Case_Elem ((_, bname), _, exp)) ->
+        List.iter ( fun (Case_Elem ((_, bname), (_,btype), exp)) ->
           currNode := {
           label = TAC_Label("None");
           comment = TAC_Comment("None");
@@ -748,6 +757,7 @@ let main() = (
           false_branch = None;
           parent_branches = [];
         };
+          caseBranchType := btype;
           Hashtbl.add ident_tac bname (TAC_Variable(fresh_var()));
           let ta, _ = convert exp.exp_kind var cname mname in
           Hashtbl.remove ident_tac bname;
@@ -756,7 +766,7 @@ let main() = (
           !currNode.true_branch <- None;
           !currNode.false_branch <- None;
         ) caseList;
-        
+        caseBranchType := "";
         !currNode.blocks <- !currNode.blocks @ i @ [TAC_Case(var, (tac_expr_to_name ta), caseList, !branchInstr)];
         i@ [TAC_Case(var, (tac_expr_to_name ta), caseList, !branchInstr)], TAC_Variable(var)
       | _ -> [], TAC_Variable("None")
