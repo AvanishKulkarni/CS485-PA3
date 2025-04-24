@@ -777,7 +777,7 @@ let main() = (
   )
   in
   let rec numTemps (a: exp_kind) : int = (
-    match a with
+    1+match a with
     | Identifier(v) -> 1
     | Integer(i) -> 1
     | Bool(i) -> 1
@@ -789,9 +789,9 @@ let main() = (
     | Lt(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
     | Le(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
     | Eq(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
-    | Not(a1) -> numTemps a1.exp_kind
-    | Negate(a1) -> numTemps a1.exp_kind
-    | Isvoid(a1) -> numTemps a1.exp_kind
+    | Not(a1) -> max 1  (numTemps a1.exp_kind)
+    | Negate(a1) -> max 1 (numTemps a1.exp_kind)
+    | Isvoid(a1) -> max 1 (numTemps a1.exp_kind)
     | Block(exp) ->
       List.length exp +
       List.fold_left (fun acc e ->
