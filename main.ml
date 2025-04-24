@@ -565,11 +565,11 @@ let main() = (
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
-        let name =
+        (* let name =
           match name with
             | "SELF_TYPE" -> cname
             | _ -> name
-        in
+        in *)
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
@@ -1224,7 +1224,14 @@ let main() = (
       stackOffset := !stackOffset -16;
     | TAC_Assign_New(var, name) ->
       fprintf fout "\n\t## new object\n";
+      if (name = "SELF_TYPE") then (
+        fprintf fout "\n\t## new SELF_TYPE\n";
+        fprintf fout "\tmovq %%r12, %%rdi\n";
+        fprintf fout "\tcall self_type_handler\n";
+        (* fprintf fout "\taddq $8, %%rsp\n"; *)
+      ) else (
       call_new fout name;
+      );
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
     | TAC_Assign_Default(var, name) ->
@@ -2309,6 +2316,25 @@ in
     fprintf aout "\tmovq $1, 24(%%r13)\n";
     fprintf aout ".globl is_void_false\nis_void_false:\n";
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+
+    (* new self_type *)
+    fprintf aout "\n## new SELF_TYPE\n";
+    fprintf aout ".globl self_type_handler\nself_type_handler:\n";
+    fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+    fprintf aout "\tmovq 0(%%rdi), %%r13\n";
+    Hashtbl.iter ( fun cname ctag ->
+      fprintf aout "\tmovq $%d, %%r14\n" ctag;
+      fprintf aout "\tcmpq %%r14, %%r13\n";
+      fprintf aout "\tje self_type_%s\n" cname;
+    ) class_tags;
+    Hashtbl.iter ( fun cname ctag ->
+      fprintf aout ".globl self_type_%s\nself_type_%s:\n" cname cname;
+      call_new aout cname;
+      fprintf aout "\tjmp self_type_end\n";
+    ) class_tags;
+    fprintf aout ".globl self_type_end\nself_type_end:\n";
+    fprintf aout "\tpopq %%rbp\n";
+    fprintf aout "\tret\n";
     (* print out program start *)
 
     fprintf aout "\n## PROGRAM BEGINS HERE\n";
