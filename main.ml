@@ -778,10 +778,10 @@ let main() = (
   in
   let rec numTemps (a: exp_kind) : int = (
     match a with
-    | Identifier(v) -> 0
-    | Integer(i) -> 0
-    | Bool(i) -> 0
-    | String(i) -> 0
+    | Identifier(v) -> 1
+    | Integer(i) -> 1
+    | Bool(i) -> 1
+    | String(i) -> 1
     | Plus(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
     | Minus(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
     | Times(a1, a2) -> max (numTemps a1.exp_kind) (1 + numTemps a2.exp_kind)
@@ -796,22 +796,22 @@ let main() = (
       List.length exp +
       List.fold_left (fun acc e ->
         max acc (numTemps e.exp_kind)
-      ) 0 exp
+      ) 1 exp
     | Dynamic_Dispatch(caller, (_, mname), args) -> 
       max (numTemps caller.exp_kind) (
       1+List.fold_left (fun acc e ->
         max acc (numTemps e.exp_kind)
-      ) 0 args)
+      ) 1 args)
     | Self_Dispatch((_,mname), args) -> 
       1+List.fold_left (fun acc e ->
         max acc (numTemps e.exp_kind)
-      ) 0 args
+      ) 1 args
     | Static_Dispatch(caller, _, (_, mname), args) -> 
       max (numTemps caller.exp_kind) (
       1+List.fold_left (fun acc e ->
         max acc (numTemps e.exp_kind)
-      ) 0 args)
-    | New((_, name)) -> 0
+      ) 1 args)
+    | New((_, name)) -> 1
     | Let(bindlist, let_body) ->
       List.length bindlist + numTemps let_body.exp_kind
     | Assign((_, name), exp) -> 1 + numTemps exp.exp_kind(* same as let *)
