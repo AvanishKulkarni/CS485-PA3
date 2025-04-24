@@ -96,7 +96,7 @@ type tac_instr =
   | TAC_Jump of label
   | TAC_Return of label
   | TAC_Internal of label 
-  | TAC_Case of label * label * case_elem list * (tac_instr list list)
+  | TAC_Case of label * label * case_elem list * (cfg_node list)
 and tac_expr =
   | TAC_Variable of label
 and label = string
@@ -749,19 +749,23 @@ let main() = (
         let branchInstr = ref [] in
         let tempNode = !currNode in
         List.iter ( fun (Case_Elem ((_, bname), (_,btype), exp)) ->
-          currNode := {
-          label = TAC_Label("None");
-          comment = TAC_Comment("None");
-          blocks = [];
-          true_branch = None;
-          false_branch = None;
-          parent_branches = [];
-        };
+          let bvar = fresh_var() in
+          let branchNode = {
+            label = TAC_Internal("");
+            comment = TAC_Internal("");
+            blocks = [TAC_Assign_Identifier(bvar, tac_expr_to_name ta)];
+            true_branch = None;
+            false_branch = None;
+            parent_branches = [];
+          } in (* currNode is just a placeholder, doesn't get used*)
+          currNode := branchNode;
           caseBranchType := btype;
-          Hashtbl.add ident_tac bname (TAC_Variable(fresh_var()));
-          let ta, _ = convert exp.exp_kind var cname mname in
+          Hashtbl.add ident_tac bname (TAC_Variable(bvar));
+          let _, _ = convert exp.exp_kind var cname mname in
           Hashtbl.remove ident_tac bname;
-          branchInstr := !branchInstr @ [ta];
+
+          (* branchInstr := !branchInstr @ [[TAC_Assign_Identifier(bvar, tac_expr_to_name ta)] @ new_ta]; *)
+          branchInstr := !branchInstr @ [branchNode];
           currNode := tempNode;
           !currNode.true_branch <- None;
           !currNode.false_branch <- None;
@@ -840,7 +844,7 @@ let main() = (
   let divCounter = (ref 0) in 
   let voidCounter = (ref 0) in
   let caseErrorCounter = (ref 0) in
-
+  let visitedNodes = ref [] in
   (* convert TAC instructions into asm *)
   let rec tac_to_asm fout stackOffset tac_instruction = (
     match tac_instruction with
@@ -1287,8 +1291,8 @@ let main() = (
         if (Hashtbl.mem envtable i) then (
             fprintf fout "\tmovq %s, %%r13\n" (Hashtbl.find envtable i);
         ) else (
-            stackOffset := !stackOffset + 16;
-            fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
+            (* stackOffset := !stackOffset + 16; *)
+            fprintf fout "\tmovq %d(%%rbp), %%r13\n" (!stackOffset+16);
         );
         let branchLabels : (string, string) Hashtbl.t = Hashtbl.create 255 in
         let voidLabel = fresh_label "case" "void" in
@@ -1339,12 +1343,16 @@ let main() = (
         fprintf fout "\tcall exit\n";
         caseErrorCounter := !caseErrorCounter + 1;
         (* output code for each branch, starting from the least type first *)
-        List.iter2 ( fun (Case_Elem (_, (_, btype), cexp)) tacs->
+        List.iter2 ( fun (Case_Elem (_, (_, btype), cexp)) nodes->
             fprintf fout ".globl %s\n%s:\n" (Hashtbl.find branchLabels btype) (Hashtbl.find branchLabels btype);
             let tacOffset = ref !stackOffset in
-            List.iter ( fun x ->
+            (* List.iter ( fun x ->
               tac_to_asm fout tacOffset x;
-            ) tacs;
+            ) tacs; *)
+            let temp = !visitedNodes in
+            visitedNodes := [];
+            output_asm fout tacOffset (Some(nodes));
+            visitedNodes := temp;
             fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!tacOffset + 16);
             fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset);
             fprintf fout "\tjmp %s\n" endLabel;
@@ -1353,10 +1361,7 @@ let main() = (
         fprintf fout ".globl %s\n%s:\n" endLabel endLabel;
         (* no branches are picked, output a runtime error*)
     | _ -> fprintf fout ""
-  )
-  in
-  let visitedNodes = ref [] in
-  let rec output_asm fout stackOffset cfgNode = (
+  ) and output_asm fout stackOffset cfgNode = (
     match cfgNode with
     | None -> ();
     | Some(cfgNode) -> 

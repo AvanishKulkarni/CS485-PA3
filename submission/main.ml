@@ -96,7 +96,7 @@ type tac_instr =
   | TAC_Jump of label
   | TAC_Return of label
   | TAC_Internal of label 
-  | TAC_Case of label * label * case_elem list * (tac_instr list list)
+  | TAC_Case of label * label * case_elem list * (cfg_node list)
 and tac_expr =
   | TAC_Variable of label
 and label = string
@@ -565,11 +565,11 @@ let main() = (
         !currNode.blocks <- !currNode.blocks @ [to_output];
         (!retTacInstr @ i @ [to_output]), TAC_Variable(var)
       | New((_, name)) ->
-        let name =
+        (* let name =
           match name with
             | "SELF_TYPE" -> cname
             | _ -> name
-        in
+        in *)
         !currNode.blocks <- !currNode.blocks @ [TAC_Assign_New(var, name)];
         [TAC_Assign_New(var, name)], TAC_Variable(var)
       | Let(bindlist, let_body) ->
@@ -749,19 +749,23 @@ let main() = (
         let branchInstr = ref [] in
         let tempNode = !currNode in
         List.iter ( fun (Case_Elem ((_, bname), (_,btype), exp)) ->
-          currNode := {
-          label = TAC_Label("None");
-          comment = TAC_Comment("None");
-          blocks = [];
-          true_branch = None;
-          false_branch = None;
-          parent_branches = [];
-        };
+          let bvar = fresh_var() in
+          let branchNode = {
+            label = TAC_Internal("");
+            comment = TAC_Internal("");
+            blocks = [TAC_Assign_Identifier(bvar, tac_expr_to_name ta)];
+            true_branch = None;
+            false_branch = None;
+            parent_branches = [];
+          } in (* currNode is just a placeholder, doesn't get used*)
+          currNode := branchNode;
           caseBranchType := btype;
-          Hashtbl.add ident_tac bname (TAC_Variable(fresh_var()));
-          let ta, _ = convert exp.exp_kind var cname mname in
+          Hashtbl.add ident_tac bname (TAC_Variable(bvar));
+          let _, _ = convert exp.exp_kind var cname mname in
           Hashtbl.remove ident_tac bname;
-          branchInstr := !branchInstr @ [ta];
+
+          (* branchInstr := !branchInstr @ [[TAC_Assign_Identifier(bvar, tac_expr_to_name ta)] @ new_ta]; *)
+          branchInstr := !branchInstr @ [branchNode];
           currNode := tempNode;
           !currNode.true_branch <- None;
           !currNode.false_branch <- None;
@@ -840,7 +844,7 @@ let main() = (
   let divCounter = (ref 0) in 
   let voidCounter = (ref 0) in
   let caseErrorCounter = (ref 0) in
-
+  let visitedNodes = ref [] in
   (* convert TAC instructions into asm *)
   let rec tac_to_asm fout stackOffset tac_instruction = (
     match tac_instruction with
@@ -1224,7 +1228,14 @@ let main() = (
       stackOffset := !stackOffset -16;
     | TAC_Assign_New(var, name) ->
       fprintf fout "\n\t## new object\n";
+      if (name = "SELF_TYPE") then (
+        fprintf fout "\n\t## new SELF_TYPE\n";
+        fprintf fout "\tmovq %%r12, %%rdi\n";
+        fprintf fout "\tcall self_type_handler\n";
+        (* fprintf fout "\taddq $8, %%rsp\n"; *)
+      ) else (
       call_new fout name;
+      );
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
       stackOffset := !stackOffset -16;
     | TAC_Assign_Default(var, name) ->
@@ -1280,8 +1291,8 @@ let main() = (
         if (Hashtbl.mem envtable i) then (
             fprintf fout "\tmovq %s, %%r13\n" (Hashtbl.find envtable i);
         ) else (
-            stackOffset := !stackOffset + 16;
-            fprintf fout "\tmovq %d(%%rbp), %%r13\n" !stackOffset;
+            (* stackOffset := !stackOffset + 16; *)
+            fprintf fout "\tmovq %d(%%rbp), %%r13\n" (!stackOffset+16);
         );
         let branchLabels : (string, string) Hashtbl.t = Hashtbl.create 255 in
         let voidLabel = fresh_label "case" "void" in
@@ -1332,12 +1343,16 @@ let main() = (
         fprintf fout "\tcall exit\n";
         caseErrorCounter := !caseErrorCounter + 1;
         (* output code for each branch, starting from the least type first *)
-        List.iter2 ( fun (Case_Elem (_, (_, btype), cexp)) tacs->
+        List.iter2 ( fun (Case_Elem (_, (_, btype), cexp)) nodes->
             fprintf fout ".globl %s\n%s:\n" (Hashtbl.find branchLabels btype) (Hashtbl.find branchLabels btype);
             let tacOffset = ref !stackOffset in
-            List.iter ( fun x ->
+            (* List.iter ( fun x ->
               tac_to_asm fout tacOffset x;
-            ) tacs;
+            ) tacs; *)
+            let temp = !visitedNodes in
+            visitedNodes := [];
+            output_asm fout tacOffset (Some(nodes));
+            visitedNodes := temp;
             fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!tacOffset + 16);
             fprintf fout "\tmovq %%r14, %d(%%rbp)\n" (!stackOffset);
             fprintf fout "\tjmp %s\n" endLabel;
@@ -1346,10 +1361,7 @@ let main() = (
         fprintf fout ".globl %s\n%s:\n" endLabel endLabel;
         (* no branches are picked, output a runtime error*)
     | _ -> fprintf fout ""
-  )
-  in
-  let visitedNodes = ref [] in
-  let rec output_asm fout stackOffset cfgNode = (
+  ) and output_asm fout stackOffset cfgNode = (
     match cfgNode with
     | None -> ();
     | Some(cfgNode) -> 
@@ -2309,6 +2321,25 @@ in
     fprintf aout "\tmovq $1, 24(%%r13)\n";
     fprintf aout ".globl is_void_false\nis_void_false:\n";
     fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n";
+
+    (* new self_type *)
+    fprintf aout "\n## new SELF_TYPE\n";
+    fprintf aout ".globl self_type_handler\nself_type_handler:\n";
+    fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+    fprintf aout "\tmovq 0(%%rdi), %%r13\n";
+    Hashtbl.iter ( fun cname ctag ->
+      fprintf aout "\tmovq $%d, %%r14\n" ctag;
+      fprintf aout "\tcmpq %%r14, %%r13\n";
+      fprintf aout "\tje self_type_%s\n" cname;
+    ) class_tags;
+    Hashtbl.iter ( fun cname ctag ->
+      fprintf aout ".globl self_type_%s\nself_type_%s:\n" cname cname;
+      call_new aout cname;
+      fprintf aout "\tjmp self_type_end\n";
+    ) class_tags;
+    fprintf aout ".globl self_type_end\nself_type_end:\n";
+    fprintf aout "\tpopq %%rbp\n";
+    fprintf aout "\tret\n";
     (* print out program start *)
 
     fprintf aout "\n## PROGRAM BEGINS HERE\n";
