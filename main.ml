@@ -1605,7 +1605,7 @@ in
         (match cname, mname with 
         | "IO", "in_int" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $16, %%rsp\n";
+          fprintf aout "\tsubq $8, %%rsp\n";
 
           call_new aout "Int";
           fprintf aout "\tmovq %%r13, %%r14\n";
@@ -1614,7 +1614,10 @@ in
           fprintf aout "\n\t## calloc input buffer, store ptr in stack\n";
           fprintf aout "\tmovl $1, %%esi\n";
           fprintf aout "\tmovl $4096, %%edi\n";
+          fprintf aout "\tmovq %%rsp, %%r13\n";
+          fprintf aout "\tandq $-16, %%rsp\n";
           fprintf aout "\tcall calloc\n";
+          fprintf aout "\tmovq %%r13, %%rsp\n";
           fprintf aout "\tpushq %%rax\n";
 
           (* read input with fgets into buffer *)
