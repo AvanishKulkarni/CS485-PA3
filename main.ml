@@ -976,9 +976,9 @@ let main() = (
 
       (* use cooloutstr to error out *)
       fprintf fout "\tmovq $%s, %%rdi\n" ("divErrString" ^ string_of_int(!divCounter));
-      fprintf fout "\tandq $-16, %%rsp\n";
+      (* fprintf fout "\tandq $-16, %%rsp\n"; *)
       fprintf fout "\tcall cooloutstr\n";
-      fprintf fout "\tandq $-16, %%rsp\n";
+      (* fprintf fout "\tandq $-16, %%rsp\n"; *)
       fprintf fout "\tmovl $1, %%edi\n";
       fprintf fout "\tcall exit\n";
 
@@ -1007,11 +1007,11 @@ let main() = (
         fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovq %%r15, %%rsi\n";
-      fprintf fout "\tandq $-16, %%rsp\n";
+      (* fprintf fout "\tandq $-16, %%rsp\n"; *)
       fprintf fout "\tcall lt_handler\n";
-      fprintf fout "\tpushq %%rax\n";
+      fprintf fout "\tpushq %%rax\n\tpushq %%rbp\n";
       call_new fout "Bool";
-      fprintf fout "\tpopq %%rax\n";
+      fprintf fout "\taddq $8, %%rsp\n\tpopq %%rax\n";
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
       stackOffset := !stackOffset -16;
@@ -1031,11 +1031,11 @@ let main() = (
         fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i1));
       );
       fprintf fout "\tmovq %%r15, %%rsi\n";
-      fprintf fout "\tandq $-16, %%rsp\n";
+      (* fprintf fout "\tandq $-16, %%rsp\n"; *)
       fprintf fout "\tcall le_handler\n";
-      fprintf fout "\tpushq %%rax\n";
+      fprintf fout "\tpushq %%rax\n\tpushq %%rbp\n";
       call_new fout "Bool";
-      fprintf fout "\tpopq %%rax\n";
+      fprintf fout "\taddq $8, %%rsp\n\tpopq %%rax\n";
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
       stackOffset := !stackOffset -16;
@@ -1055,11 +1055,11 @@ let main() = (
         fprintf fout "\tmovq %s, %%r15\n" (Hashtbl.find envtable (tac_expr_to_name i2));
       );
       fprintf fout "\tmovq %%r15, %%rsi\n";
-      fprintf fout "\tandq $-16, %%rsp\n";
+      (* fprintf fout "\tandq $-16, %%rsp\n"; *)
       fprintf fout "\tcall eq_handler\n";
-      fprintf fout "\tpushq %%rax\n";
+      fprintf fout "\tpushq %%rax\n\tpushq %%rbp\n";
       call_new fout "Bool";
-      fprintf fout "\tpopq %%rax\n";
+      fprintf fout "\taddq $8, %%rsp\n\tpopq %%rax\n";
       fprintf fout "\tmovq %%rax, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
       stackOffset := !stackOffset -16;
@@ -1073,9 +1073,9 @@ let main() = (
       );
       fprintf fout "\tmovl 24(%%r14), %%edi\n";
       fprintf fout "\tnegl %%edi\n";
-      fprintf fout "\tpushq %%rdi\n";
+      fprintf fout "\tpushq %%rdi\n\tpushq %%rbp\n";
       call_new fout "Int";
-      fprintf fout "\tpopq %%rdi\n";
+      fprintf fout "\taddq $8, %%rsp\n\tpopq %%rdi\n";
       fprintf fout "\tmovl %%edi, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
       stackOffset := !stackOffset -16;
@@ -1089,9 +1089,9 @@ let main() = (
       );
       fprintf fout "\tmovq 24(%%r14), %%r14\n";
       fprintf fout "\txorq $1, %%r14\n";
-      fprintf fout "\tpushq %%r14\n";
+      fprintf fout "\tpushq %%r14\n\tpushq %%rbp\n";
       call_new fout "Bool";
-      fprintf fout "\tpopq %%r14\n";
+      fprintf fout "\taddq $8, %%rsp\n\tpopq %%r14\n";
       fprintf fout "\tmovq %%r14, 24(%%r13)\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
       stackOffset := !stackOffset -16;
@@ -1134,6 +1134,9 @@ let main() = (
 
       fprintf fout ".globl void_good_%d\nvoid_good_%d:\n" !voidCounter !voidCounter;
       voidCounter := !voidCounter + 1;
+      if (List.length args_vars mod 2 = 0) then (
+        fprintf fout "\tpushq %%rbp\n";
+      ); (*pushing dummy value to maintain 16-byte aligned stack*)
       List.iteri (fun i var -> 
         let var = (tac_expr_to_name var) in
         if not(Hashtbl.mem envtable var) then (
@@ -1149,7 +1152,7 @@ let main() = (
       fprintf fout "\tmovq $%s..vtable, %%r14\n" cname;
       fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
       fprintf fout "\tcall *%%r14\n";
-      fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars);
+      fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars + 8*(if (List.length args_vars mod 2 = 0) then 1 else 0));
       fprintf fout "\tpopq %%rbp\n";
       fprintf fout "\tpopq %%r12\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
@@ -1177,7 +1180,9 @@ let main() = (
 
       fprintf fout ".globl void_good_%d\nvoid_good_%d:\n" !voidCounter !voidCounter;
       voidCounter := !voidCounter + 1;
-
+      if (List.length args_vars mod 2 = 0) then (
+        fprintf fout "\tpushq %%rbp\n";
+      ); (*pushing dummy value to maintain 16-byte aligned stack*)
       List.iteri (fun i var -> 
         let var = (tac_expr_to_name var) in
         if not(Hashtbl.mem envtable var) then (
@@ -1193,7 +1198,7 @@ let main() = (
         fprintf fout "\tmovq 16(%%r12), %%r14\n";
         fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
         fprintf fout "\tcall *%%r14\n";
-        fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars);
+        fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars + 8*(if (List.length args_vars mod 2 = 0) then 1 else 0));
         fprintf fout "\tpopq %%rbp\n";
         fprintf fout "\tpopq %%r12\n";
         fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
@@ -1202,6 +1207,9 @@ let main() = (
       fprintf fout "\n\t## %s <- call %s(...) - Self Dispatch\n" var mname;
       fprintf fout "\tpushq %%r12\n";
       fprintf fout "\tpushq %%rbp\n";
+      if (List.length args_vars mod 2 = 0) then (
+        fprintf fout "\tpushq %%rbp\n";
+      ); (*pushing dummy value to maintain 16-byte aligned stack*)
       List.iteri (fun i var -> 
         let var = (tac_expr_to_name var) in
         if not(Hashtbl.mem envtable var) then (
@@ -1217,7 +1225,7 @@ let main() = (
       fprintf fout "\tmovq 16(%%r12), %%r14\n";
       fprintf fout "\tmovq %d(%%r14), %%r14\n" vtableOffset;
       fprintf fout "\tcall *%%r14\n";
-      fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars);
+      fprintf fout "\taddq $%d, %%rsp\n" (8 + 8 * List.length args_vars + 8*(if (List.length args_vars mod 2 = 0) then 1 else 0));
       fprintf fout "\tpopq %%rbp\n";
       fprintf fout "\tpopq %%r12\n";
       fprintf fout "\tmovq %%r13, %d(%%rbp)\n" (!stackOffset);
@@ -1323,18 +1331,18 @@ let main() = (
         (* void branch *)
         fprintf fout ".globl %s\n%s:\n" voidLabel voidLabel;
         fprintf fout "\tmovq $%s, %%rdi\n" ("voidErrString" ^ string_of_int(!voidCounter));
-        fprintf fout "\tandq $-16, %%rsp\n";
+        (* fprintf fout "\tandq $-16, %%rsp\n"; *)
         fprintf fout "\tcall cooloutstr\n";
-        fprintf fout "\tandq $-16, %%rsp\n";
+        (* fprintf fout "\tandq $-16, %%rsp\n"; *)
         fprintf fout "\tmovl $1, %%edi\n";
         fprintf fout "\tcall exit\n";
         voidCounter := !voidCounter + 1;
         (* no matching branches *)
         fprintf fout ".globl %s\n%s:\n" errorLabel errorLabel;
         fprintf fout "\tmovq $%s, %%rdi\n" ("caseErrString" ^ string_of_int(!caseErrorCounter));
-        fprintf fout "\tandq $-16, %%rsp\n";
+        (* fprintf fout "\tandq $-16, %%rsp\n"; *)
         fprintf fout "\tcall cooloutstr\n";
-        fprintf fout "\tandq $-16, %%rsp\n";
+        (* fprintf fout "\tandq $-16, %%rsp\n"; *)
         fprintf fout "\tmovl $1, %%edi\n";
         fprintf fout "\tcall exit\n";
         caseErrorCounter := !caseErrorCounter + 1;
@@ -1657,7 +1665,7 @@ in
         )
         | "IO", "out_int" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tmovq 24(%%rbp), %%r14\n";
           fprintf aout "\tmovq 24(%%r14), %%r13\n";
           fprintf aout "\tmovq $percent.ld, %%rdi\n";
@@ -1681,7 +1689,7 @@ in
         )
         | "Object", "abort" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tmovq $abort.string, %%rdi\n";
           fprintf aout "\tcall cooloutstr\n";
           fprintf aout "\tmovl $0, %%edi\n";
@@ -1719,7 +1727,7 @@ in
         )
         | "Object", "type_name" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tpushq %%rbp\n";
           fprintf aout "\tpushq %%r12\n";
           fprintf aout "\tmovq $String..new, %%r14\n";
@@ -1732,7 +1740,7 @@ in
         )
         | "String", "length" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           call_new aout "Int";
           fprintf aout "\tmovq %%r13, %%r14\n";
           fprintf aout "\tmovq 24(%%r12), %%r13\n";
@@ -1745,7 +1753,7 @@ in
         )
         | "String", "concat" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\t\n## init new string for return\n";
           call_new aout "String";
           fprintf aout "\tmovq %%r13, %%r15\n";
@@ -1763,7 +1771,7 @@ in
         )
         | "String", "substr" -> (
           fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-          fprintf aout "\tsubq $8, %%rsp\n";
+          fprintf aout "\tsubq $16, %%rsp\n";
           fprintf aout "\tpushq %%rbp\n";
           fprintf aout "\tpushq %%r12\n";
           fprintf aout "\tmovq $String..new, %%r14\n";
