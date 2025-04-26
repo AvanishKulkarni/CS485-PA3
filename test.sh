@@ -1,7 +1,7 @@
 #!/bin/bash
-if [ main.ml -nt main ]; then
-    ocamlopt main.ml -g -o main 
-fi
+
+ocamlopt -o main unix.cmxa str.cmxa *.ml -g
+
 count=0
 total=0
 function run_tests() {
