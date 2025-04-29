@@ -473,3 +473,132 @@ let tac (a: exp_kind) (var : name) (cname: name) (mname: name) = (
 
   (tlist, texp)
 )
+let tac_output_pa4c1 (fname: name) (cltype) = (
+let output_tac_helper fout tac_instructions = (
+      match tac_instructions with
+      | TAC_Assign_Identifier(var, i) ->
+        fprintf fout "%s <- %s\n" var i
+      | TAC_Assign_Int(var, i) ->
+        fprintf fout "%s <- int %s\n" var i
+      | TAC_Assign_Bool(var, i) ->
+        fprintf fout "%s <- bool %s\n" var i
+      | TAC_Assign_String(var, i) ->
+        fprintf fout "%s <- string\n%s\n" var i
+      | TAC_Assign_Plus(var, i1, i2) ->
+        fprintf fout "%s <- + %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Minus(var, i1, i2) ->
+        fprintf fout "%s <- - %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Times(var, i1, i2) ->
+        fprintf fout "%s <- * %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Div(var, i1, i2) ->
+        fprintf fout "%s <- / %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Lt(var, i1, i2) ->
+        fprintf fout "%s <- < %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Le(var, i1, i2) ->
+        fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_Eq(var, i1, i2) ->
+        fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1) (tac_expr_to_name i2)
+      | TAC_Assign_ArithNegate(var, i) ->
+        fprintf fout "%s <- ~ %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_BoolNegate(var, i) ->
+        fprintf fout "%s <- not %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_NullCheck(var, i) ->
+        fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
+      | TAC_Assign_Static_FunctionCall(var, mname, stype, args_vars) ->
+        fprintf fout "%s <- call %s\n" var mname;
+        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+        fprintf fout "\n";
+      | TAC_Assign_Dynamic_FunctionCall(var, mname, caller, args_vars) ->
+        fprintf fout "%s <- call %s" var mname;
+        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+        fprintf fout "\n";
+      | TAC_Assign_Self_FunctionCall(var, mname, cname, args_vars) ->
+        fprintf fout "%s <- call %s" var mname;
+        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+        fprintf fout "\n";
+      | TAC_Assign_New(var, name) ->
+        fprintf fout "%s <- new %s\n" var name
+      | TAC_Assign_Default(var, name) ->
+        fprintf fout "%s <- default %s\n" var name;
+      | TAC_Assign_Assign(var, i) ->
+        fprintf fout "%s <- %s\n" var (tac_expr_to_name i);
+      | TAC_Branch_True(cond, label) -> 
+        fprintf fout "bt %s %s\n" cond label; 
+      | TAC_Comment(comment) ->
+        fprintf fout "comment %s\n" comment;
+      | TAC_Jump(label) -> 
+        fprintf fout "jmp %s\n" label;
+      | TAC_Label(label) ->
+        fprintf fout "label %s\n" label
+      | TAC_Return(label) ->
+        fprintf fout "ret %s\n" label
+      | _ -> fprintf fout ""
+
+    
+  )
+  in
+  let tacVisitedNodes = ref [] in
+  let rec output_tac fout cfgNode = (
+    match cfgNode with
+    | None -> ();
+    | Some(cfgNode) -> 
+      if (not(List.mem cfgNode.label !tacVisitedNodes) && 
+        (List.for_all (fun x -> match x with Some(x) -> List.mem x.label !tacVisitedNodes; | None -> true) cfgNode.parent_branches)) then (
+        (* printf "In cfg %s\n" (match cfgNode.label with | TAC_Label(label) -> label | _ -> "");
+        printf "StackOffset Before Blocks: %d\n" !stackOffset; *)
+        tacVisitedNodes :=  cfgNode.label :: !tacVisitedNodes;
+        output_tac_helper fout cfgNode.comment;
+        output_tac_helper fout cfgNode.label;
+        List.iter ( fun x ->
+          output_tac_helper fout x;
+        ) cfgNode.blocks;
+        (* printf "StackOffset After Blocks: %d\n" !stackOffset; *)
+        output_tac fout cfgNode.true_branch;
+        (* stackOffset := !trueOffset; *)
+        output_tac fout cfgNode.false_branch;
+        
+        
+      )
+  ) in
+  let cltname = Filename.chop_extension fname ^ ".cl-tac" in
+  let fout = open_out cltname in
+  let _, _, _, ast = cltype in (
+    (* given the AST, convert it to a tac instruction *)
+    (* fprintf fout "comment start\n"; *)
+    let compare_ast (a : cool_class) (b : cool_class) : int = (
+      let ((_, aname), _, _) = a in 
+      let ((_, bname), _, _) = b in 
+      compare aname bname 
+    ) in 
+    let sorted_ast = List.sort compare_ast ast in 
+    let (_, cname), _, features = List.hd sorted_ast in
+    let first_method = List.find (fun x -> 
+      match x with 
+      | Method _ -> true 
+      | _ -> false
+      ) features in
+    List.iter ( fun x ->
+      match x with
+      | Attribute((_,name), _, _) ->
+        Hashtbl.add ident_tac name (TAC_Variable(name));
+      | _ -> printf "";
+    ) features;
+    match first_method with
+    | Method((_, mname), _, _, mexp) ->
+      (* fprintf fout "label %s_%s_0\n" cname mname; *)
+      let node : cfg_node = {
+        label = TAC_Label((sprintf "%s_%s_0" cname mname));
+        comment = TAC_Comment("start");
+        blocks = [];
+        true_branch = None;
+        false_branch = None;
+        parent_branches = [];
+      }
+      in
+      currNode := node;
+      let tac_instructions, tac_var = tac mexp.exp_kind (fresh_var()) cname mname in
+      output_tac fout (Some(node));
+      fprintf fout "return %s\n" (tac_expr_to_name tac_var)
+    | _ -> fprintf fout ""
+  )
+)
