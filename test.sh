@@ -1,7 +1,7 @@
 #!/bin/bash
-
-ocamlopt -o main unix.cmxa str.cmxa *.ml -g
-
+if find . -name '*.ml' -newer main | grep -q .; then
+    ocamlopt -o main unix.cmxa str.cmxa *.ml -g
+fi
 count=0
 total=0
 function run_tests() {

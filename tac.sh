@@ -1,6 +1,6 @@
 #!/bin/bash
-if [ tac.ml -nt tac ]; then
-    ocamlopt tac.ml -g -o tac
+if find . -name '*.ml' -newer main | grep -q .; then
+    ocamlopt -o main unix.cmxa str.cmxa *.ml -g
 fi
 
 if [ "$#" -ne 1 ]; then 
@@ -11,5 +11,5 @@ fi
 input=$1
 fname="${input%.*}"
 cool --type "$fname.cl"
-./tac "$fname.cl-type"
+./main "$fname.cl-type"
 cool --out "$fname"_ref --tac "$1.cl"
