@@ -50,17 +50,17 @@ if [ -n "$1" ]; then
     fname="${input%.*}"
     run_tests $fname
     if [ -e "$fname.cl-input" ]; then 
-        echo "our output:"
+        echo -e "\e[35;1mOur Output:\e[0m"
         ./a.out < "$fname.cl-input"
         echo
-        echo "cool ref output:"
+        echo -e "\e[35;1mCool Ref Output:\e[0m"
         cool "$fname.cl" < "$fname.cl-input"
         echo
     else 
-        echo "our output:"
+        echo -e "\e[35;1mOur Output:\e[0m"
         ./a.out
         echo
-        echo "cool ref output:"
+        echo -e "\e[35;1mCool Ref Output:\e[0m"
         cool "$fname.cl"
         echo
     fi
