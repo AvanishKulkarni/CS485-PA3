@@ -14,15 +14,10 @@ and feature =
   | Method of id * formal list * cool_type * exp
 
 and formal = id * cool_type
-
-and exp = {
-  loc : loc;
-  exp_kind : exp_kind;
-  static_type : static_type option;
-}
+and exp = { loc : loc; exp_kind : exp_kind; static_type : static_type option }
 
 and exp_kind =
-  | Assign of id * exp 
+  | Assign of id * exp
   | Dynamic_Dispatch of exp * id * exp list
   | Static_Dispatch of exp * id * id * exp list
   | Self_Dispatch of id * exp list
@@ -57,7 +52,7 @@ and case_elem = Case_Elem of id * cool_type * exp
 type tac_instr =
   | IConst of iconst
   | BConst of bconst
-  | SConst of sconst 
+  | SConst of sconst
   | Jump of label
   | Label of label
   | Return of string
@@ -75,12 +70,13 @@ type tac_instr =
   | TAC_Assign_Eq of label * tac_expr * tac_expr
   | TAC_Assign_BoolNegate of label * tac_expr
   | TAC_Assign_ArithNegate of label * tac_expr
-  | TAC_Assign_ObjectAlloc of label * label (* might have to change to tac_expr *)
+  | TAC_Assign_ObjectAlloc of
+      label * label (* might have to change to tac_expr *)
   | TAC_Assign_ObjectDefault of label * label
   | TAC_Assign_NullCheck of label * tac_expr
-  | TAC_Assign_Dynamic_FunctionCall of label * label * label * (tac_expr list)
-  | TAC_Assign_Static_FunctionCall of label * label * label * (tac_expr list)
-  | TAC_Assign_Self_FunctionCall of label * label * label * (tac_expr list)
+  | TAC_Assign_Dynamic_FunctionCall of label * label * label * tac_expr list
+  | TAC_Assign_Static_FunctionCall of label * label * label * tac_expr list
+  | TAC_Assign_Self_FunctionCall of label * label * label * tac_expr list
   | TAC_Assign_New of label * label
   | TAC_Assign_Default of label * label
   | TAC_Remove_Let of label
@@ -90,19 +86,20 @@ type tac_instr =
   | TAC_Label of label
   | TAC_Jump of label
   | TAC_Return of label
-  | TAC_Internal of label 
-  | TAC_Case of label * label * case_elem list * (cfg_node list)
-and tac_expr =
-  | TAC_Variable of label
+  | TAC_Internal of label
+  | TAC_Case of label * label * case_elem list * cfg_node list
+
+and tac_expr = TAC_Variable of label
 and label = string
 and iconst = string
-and bconst = string 
+and bconst = string
 and sconst = string
+
 and cfg_node = {
-  label: tac_instr;
-  comment: tac_instr;
-  mutable blocks: tac_instr list;
-  mutable true_branch: cfg_node option;
-  mutable false_branch: cfg_node option;
-  mutable parent_branches: cfg_node option list;
+  label : tac_instr;
+  comment : tac_instr;
+  mutable blocks : tac_instr list;
+  mutable true_branch : cfg_node option;
+  mutable false_branch : cfg_node option;
+  mutable parent_branches : cfg_node option list;
 }
