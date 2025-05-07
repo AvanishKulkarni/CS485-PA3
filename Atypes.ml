@@ -88,6 +88,7 @@ type tac_instr =
   | TAC_Return of label
   | TAC_Internal of label
   | TAC_Case of label * label * case_elem list * cfg_node list
+  | TAC_End_While of label
 
 and tac_expr = TAC_Variable of label
 and label = string

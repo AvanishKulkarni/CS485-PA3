@@ -597,6 +597,9 @@ let asm_output fname cltype () =
         stackOffset := !stackOffset - 16;
         fprintf fout ".globl %s\n%s:\n" endLabel endLabel
         (* no branches are picked, output a runtime error*)
+    | TAC_End_While(_) ->
+      stackOffset := !stackOffset + 16;
+      fprintf fout "\t## resetting stackOffset for while loops\n";
     | _ -> fprintf fout ""
   and output_asm fout stackOffset cfgNode =
     match cfgNode with
