@@ -339,8 +339,8 @@ let asm_output fname cltype () =
         fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
         stackOffset := !stackOffset - 16
     | TAC_Assign_Static_FunctionCall (var, mname, cname, args_vars) ->
-        (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
-        (* TODO: Add a VOID check for var, if caller is void then do a runtime error*)
+        Hashtbl.add dispatch_list ("dummy", mname) true;
+
         fprintf fout "\n\t## %s <- call %s(...) - Static Dispatch\n" var mname;
         fprintf fout "\tpushq %%r12\n";
         fprintf fout "\tpushq %%rbp\n";
@@ -389,8 +389,8 @@ let asm_output fname cltype () =
         fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
         stackOffset := !stackOffset - 16
     | TAC_Assign_Dynamic_FunctionCall (var, mname, cname, args_vars) ->
-        (* assume caller object is already on top of the stack? or maybe its vars, need to check *)
-        (* TODO: Add a VOID check for var, if caller is void then do a runtime error*)
+        Hashtbl.add dispatch_list ("dummy", mname) true;
+
         fprintf fout "\n\t## %s <- call %s(...) - Dynamic Dispatch\n" var mname;
         fprintf fout "\tpushq %%r12\n";
         fprintf fout "\tpushq %%rbp\n";
@@ -439,6 +439,8 @@ let asm_output fname cltype () =
         fprintf fout "\tmovq %%r13, %d(%%rbp)\n" !stackOffset;
         stackOffset := !stackOffset - 16
     | TAC_Assign_Self_FunctionCall (var, mname, cname, args_vars) ->
+        Hashtbl.add dispatch_list ("dummy", mname) true;
+
         fprintf fout "\n\t## %s <- call %s(...) - Self Dispatch\n" var mname;
         fprintf fout "\tpushq %%r12\n";
         fprintf fout "\tpushq %%rbp\n";
@@ -583,9 +585,6 @@ let asm_output fname cltype () =
               (Hashtbl.find branchLabels btype)
               (Hashtbl.find branchLabels btype);
             let tacOffset = ref !stackOffset in
-            (* List.iter ( fun x ->
-              tac_to_asm fout tacOffset x;
-            ) tacs; *)
             let temp = !visitedNodes in
             visitedNodes := [];
             output_asm fout tacOffset (Some nodes);
@@ -597,9 +596,9 @@ let asm_output fname cltype () =
         stackOffset := !stackOffset - 16;
         fprintf fout ".globl %s\n%s:\n" endLabel endLabel
         (* no branches are picked, output a runtime error*)
-    | TAC_End_While(_) ->
-      stackOffset := !stackOffset + 16;
-      fprintf fout "\t## resetting stackOffset for while loops\n";
+    | TAC_End_While _ ->
+        stackOffset := !stackOffset + 16;
+        fprintf fout "\t## resetting stackOffset for while loops\n"
     | _ -> fprintf fout ""
   and output_asm fout stackOffset cfgNode =
     match cfgNode with
@@ -649,7 +648,10 @@ let asm_output fname cltype () =
     "substr.error.string";
   Hashtbl.add asm_strings "abort\\n" "abort.string";
 
+  Hashtbl.add dispatch_list ("dummy", "main") true;
+
   let class_map, impl_map, parent_map, ast = cltype in
+
   List.iter
     (fun (child, parent) -> Hashtbl.add inheritance parent child)
     parent_map;
@@ -670,10 +672,6 @@ let asm_output fname cltype () =
           fprintf aout "\t.quad %s.%s\n" defclass mname)
         methods)
     impl_map;
-
-  (* Hashtbl.iter (fun (cname, mname) offset -> 
-      printf "%s.%s = %d\n" cname mname offset;  
-    ) vtable; *)
 
   (* output constructors for objects *)
   List.iteri
@@ -782,6 +780,9 @@ let asm_output fname cltype () =
         not (List.mem x [ "Object"; "IO"; "Int"; "String"; "Bool" ]))
       impl_map
   in
+
+  (* PASS 1 - find all used methods *)
+  let dummy_out = open_out "/dev/null" in
   List.iteri
     (fun cid (cname, methods) ->
       let non_inherited_methods =
@@ -789,13 +790,6 @@ let asm_output fname cltype () =
       in
       List.iteri
         (fun mid (mname, formals, _, body) ->
-          fprintf aout "## method definition of %s.%s\n" cname mname;
-          fprintf aout ".globl %s.%s\n" cname mname;
-          fprintf aout "%s.%s:\n" cname mname;
-          fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
-          fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-
-          (* add hashtbl offset entries for each formal, relative to %rbp *)
           Hashtbl.clear envtable;
           Hashtbl.clear ident_tac;
           Hashtbl.add envtable "self" "%r12";
@@ -806,15 +800,9 @@ let asm_output fname cltype () =
             (List.rev (Hashtbl.find_all attrLocations cname));
           List.iteri
             (fun i name ->
-              fprintf aout "\t## fp[%d] = %s  %d(%%rbp)\n" (3 + i) name
-                (24 + (8 * i));
               Hashtbl.add envtable name (sprintf "%d(%%rbp)" (24 + (8 * i)));
               Hashtbl.add ident_tac name (TAC_Variable name))
             formals;
-          let ntemps = numTemps body.exp_kind + 1 in
-          (* Adding 1 as assuming the return value is in a temporary*)
-          fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
-          fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
           let node : cfg_node =
             {
               label = TAC_Internal "";
@@ -828,13 +816,75 @@ let asm_output fname cltype () =
           currNode := node;
           visitedNodes := [];
           labelCount := 1;
-          (* TODO find the AST for the method and then run it *)
           let _, _ = tac body.exp_kind (fresh_var ()) cname mname in
           let stackOffset = ref 0 in
-          output_asm aout stackOffset (Some node);
-          let stackOffset = if !stackOffset = 0 then 0 else !stackOffset + 16 in
-          fprintf aout "\tmovq %d(%%rbp), %%r13\n" stackOffset;
-          fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n")
+          output_asm dummy_out stackOffset (Some node))
+        non_inherited_methods)
+    user_impl_map;
+
+  (* debug print all used classes *)
+  (* Hashtbl.iter
+    (fun (cname, mname) _ -> printf "%s.%s\n" cname mname)
+    dispatch_list; *)
+
+  (* PASS 2 - Generate code for only used user methods *)
+  List.iteri
+    (fun cid (cname, methods) ->
+      let non_inherited_methods =
+        List.filter (fun (_, _, defname, _) -> cname = defname) methods
+      in
+      List.iteri
+        (fun mid (mname, formals, _, body) ->
+          fprintf aout "## method definition of %s.%s\n" cname mname;
+          fprintf aout ".globl %s.%s\n" cname mname;
+          fprintf aout "%s.%s:\n" cname mname;
+
+          if Hashtbl.mem dispatch_list ("dummy", mname) then (
+            fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
+            fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+
+            (* add hashtbl offset entries for each formal, relative to %rbp *)
+            Hashtbl.clear envtable;
+            Hashtbl.clear ident_tac;
+            Hashtbl.add envtable "self" "%r12";
+            List.iter
+              (fun (aname, loc) ->
+                Hashtbl.add envtable aname (sprintf "%d(%%r12)" loc);
+                Hashtbl.add ident_tac aname (TAC_Variable aname))
+              (List.rev (Hashtbl.find_all attrLocations cname));
+            List.iteri
+              (fun i name ->
+                fprintf aout "\t## fp[%d] = %s  %d(%%rbp)\n" (3 + i) name
+                  (24 + (8 * i));
+                Hashtbl.add envtable name (sprintf "%d(%%rbp)" (24 + (8 * i)));
+                Hashtbl.add ident_tac name (TAC_Variable name))
+              formals;
+            let ntemps = numTemps body.exp_kind + 1 in
+            (* Adding 1 as assuming the return value is in a temporary*)
+            fprintf aout "\t## stack room for temporaries: %d\n" ntemps;
+            fprintf aout "\tsubq $%d, %%rsp\n" (ntemps * 16);
+            let node : cfg_node =
+              {
+                label = TAC_Internal "";
+                comment = TAC_Comment "\tstart";
+                blocks = [];
+                true_branch = None;
+                false_branch = None;
+                parent_branches = [];
+              }
+            in
+            currNode := node;
+            visitedNodes := [];
+            labelCount := 1;
+            (* TODO find the AST for the method and then run it *)
+            let _, _ = tac body.exp_kind (fresh_var ()) cname mname in
+            let stackOffset = ref 0 in
+            output_asm aout stackOffset (Some node);
+            let stackOffset =
+              if !stackOffset = 0 then 0 else !stackOffset + 16
+            in
+            fprintf aout "\tmovq %d(%%rbp), %%r13\n" stackOffset;
+            fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n"))
         non_inherited_methods)
     user_impl_map;
 
@@ -857,209 +907,211 @@ let asm_output fname cltype () =
           fprintf aout "## method definition of %s.%s\n" mdef mname;
           fprintf aout ".globl %s.%s\n" cname mname;
           fprintf aout "%s.%s:\n" cname mname;
-          fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
 
-          (* modified from reference compiler *)
-          (match (cname, mname) with
-          | "IO", "in_int" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $8, %%rsp\n";
+          if Hashtbl.mem dispatch_list ("dummy", mname) then (
+            fprintf aout "\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n";
 
-              call_new aout "Int";
-              fprintf aout "\tmovq %%r13, %%r14\n";
+            (* modified from reference compiler *)
+            (match (cname, mname) with
+            | "IO", "in_int" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $8, %%rsp\n";
 
-              (* allocate input buffer of size 4096 *)
-              fprintf aout "\n\t## calloc input buffer, store ptr in stack\n";
-              fprintf aout "\tmovl $1, %%esi\n";
-              fprintf aout "\tmovl $4096, %%edi\n";
-              fprintf aout "\tmovq %%rsp, %%r13\n";
-              fprintf aout "\tandq $-16, %%rsp\n";
-              fprintf aout "\tcall calloc\n";
-              fprintf aout "\tmovq %%r13, %%rsp\n";
-              fprintf aout "\tpushq %%rax\n";
+                call_new aout "Int";
+                fprintf aout "\tmovq %%r13, %%r14\n";
 
-              (* read input with fgets into buffer *)
-              fprintf aout "\n\t## read input via fgets\n";
-              fprintf aout "\tmovq %%rax, %%rdi\n";
-              fprintf aout "\tmovq $4096, %%rsi\n";
-              fprintf aout "\tmovq stdin(%%rip), %%rdx\n";
+                (* allocate input buffer of size 4096 *)
+                fprintf aout "\n\t## calloc input buffer, store ptr in stack\n";
+                fprintf aout "\tmovl $1, %%esi\n";
+                fprintf aout "\tmovl $4096, %%edi\n";
+                fprintf aout "\tmovq %%rsp, %%r13\n";
+                fprintf aout "\tandq $-16, %%rsp\n";
+                fprintf aout "\tcall calloc\n";
+                fprintf aout "\tmovq %%r13, %%rsp\n";
+                fprintf aout "\tpushq %%rax\n";
 
-              (* 16B align *)
-              fprintf aout "\n\t## guarantee 16-byte alignment before call\n";
-              fprintf aout "\tandq $-16, %%rsp\n";
-              fprintf aout "\tcall fgets\n";
+                (* read input with fgets into buffer *)
+                fprintf aout "\n\t## read input via fgets\n";
+                fprintf aout "\tmovq %%rax, %%rdi\n";
+                fprintf aout "\tmovq $4096, %%rsi\n";
+                fprintf aout "\tmovq stdin(%%rip), %%rdx\n";
 
-              (* read int *)
-              fprintf aout "\n\t## read int\n";
-              fprintf aout "\tpopq %%rdi\n";
-              fprintf aout "\tmovl $0, %%eax\n";
-              fprintf aout "\tpushq %%rax\n";
-              fprintf aout "\tmovq $percent.ld, %%rsi\n";
-              fprintf aout "\tmovq %%rsp, %%rdx\n";
+                (* 16B align *)
+                fprintf aout "\n\t## guarantee 16-byte alignment before call\n";
+                fprintf aout "\tandq $-16, %%rsp\n";
+                fprintf aout "\tcall fgets\n";
 
-              (* convert input to long with sscaf %ld *)
-              fprintf aout "\n\t## guarantee 16-byte alignment before call\n";
-              fprintf aout "\tandq $-16, %%rsp\n";
-              fprintf aout "\tcall sscanf\n";
-              fprintf aout "\tpopq %%rax\n";
+                (* read int *)
+                fprintf aout "\n\t## read int\n";
+                fprintf aout "\tpopq %%rdi\n";
+                fprintf aout "\tmovl $0, %%eax\n";
+                fprintf aout "\tpushq %%rax\n";
+                fprintf aout "\tmovq $percent.ld, %%rsi\n";
+                fprintf aout "\tmovq %%rsp, %%rdx\n";
 
-              (* check overflow of 32-bit int boundaries *)
-              fprintf aout "\n\t## check overflow\n";
-              fprintf aout "\tmovq $0, %%rsi\n";
-              fprintf aout "\tcmpq $2147483647, %%rax\n";
-              fprintf aout "\tcmovg %%rsi, %%rax\n";
-              fprintf aout "\tcmpq $-2147483648, %%rax\n";
-              fprintf aout "\tcmovl %%rsi, %%rax\n";
+                (* convert input to long with sscaf %ld *)
+                fprintf aout "\n\t## guarantee 16-byte alignment before call\n";
+                fprintf aout "\tandq $-16, %%rsp\n";
+                fprintf aout "\tcall sscanf\n";
+                fprintf aout "\tpopq %%rax\n";
 
-              fprintf aout "\n.in_int_end:\n";
-              fprintf aout "\t## store int into Int()\n";
-              fprintf aout "\tmovq %%rax, %%r13\n";
-              fprintf aout "\tmovq %%r13, 24(%%r14)\n";
-              fprintf aout "\tmovq %%r14, %%r13\n"
-          | "IO", "in_string" ->
-              fprintf aout "\tsubq $16, %%rsp\n";
-              call_new aout "String";
-              fprintf aout "\tmovq %%r13, %%r14\n";
-              fprintf aout "\tandq $-16, %%rsp\n";
-              fprintf aout "\tcall coolgetstr\n";
-              fprintf aout "\tmovq %%rax, %%r13\n";
-              fprintf aout "\tmovq %%r13, 24(%%r14)\n";
-              fprintf aout "\tmovq %%r14, %%r13\n"
-          | "IO", "out_int" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $16, %%rsp\n";
-              fprintf aout "\tmovq 24(%%rbp), %%r14\n";
-              fprintf aout "\tmovq 24(%%r14), %%r13\n";
-              fprintf aout "\tmovq $percent.ld, %%rdi\n";
-              fprintf aout "\tmovl %%r13d, %%eax\n";
-              fprintf aout "\tcdqe\n";
-              fprintf aout "\tmovq %%rax, %%rsi\n";
-              fprintf aout "\tmovl $0, %%eax\n";
-              fprintf aout "\tandq $-16, %%rsp\n";
-              fprintf aout "\tcall printf\n";
-              fprintf aout "\tmov %%r12, %%r13\n"
-          | "IO", "out_string" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $16, %%rsp\n";
-              fprintf aout "\tmovq 24(%%rbp), %%r14\n";
-              fprintf aout "\tmovq 24(%%r14), %%r13\n";
-              fprintf aout "\tmovq %%r13, %%rdi\n";
-              fprintf aout "\tandq $-16, %%rsp\n";
-              fprintf aout "\tcall cooloutstr\n";
-              fprintf aout "\tmovq %%r12, %%r13\n"
-          | "Object", "abort" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $16, %%rsp\n";
-              fprintf aout "\tmovq $abort.string, %%rdi\n";
-              fprintf aout "\tcall cooloutstr\n";
-              fprintf aout "\tmovl $0, %%edi\n";
-              fprintf aout "\tcall exit\n"
-          | "Object", "copy" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $16, %%rsp\n";
+                (* check overflow of 32-bit int boundaries *)
+                fprintf aout "\n\t## check overflow\n";
+                fprintf aout "\tmovq $0, %%rsi\n";
+                fprintf aout "\tcmpq $2147483647, %%rax\n";
+                fprintf aout "\tcmovg %%rsi, %%rax\n";
+                fprintf aout "\tcmpq $-2147483648, %%rax\n";
+                fprintf aout "\tcmovl %%rsi, %%rax\n";
 
-              fprintf aout "\tmovq 8(%%r12), %%r14\n";
+                fprintf aout "\n.in_int_end:\n";
+                fprintf aout "\t## store int into Int()\n";
+                fprintf aout "\tmovq %%rax, %%r13\n";
+                fprintf aout "\tmovq %%r13, 24(%%r14)\n";
+                fprintf aout "\tmovq %%r14, %%r13\n"
+            | "IO", "in_string" ->
+                fprintf aout "\tsubq $16, %%rsp\n";
+                call_new aout "String";
+                fprintf aout "\tmovq %%r13, %%r14\n";
+                fprintf aout "\tandq $-16, %%rsp\n";
+                fprintf aout "\tcall coolgetstr\n";
+                fprintf aout "\tmovq %%rax, %%r13\n";
+                fprintf aout "\tmovq %%r13, 24(%%r14)\n";
+                fprintf aout "\tmovq %%r14, %%r13\n"
+            | "IO", "out_int" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $16, %%rsp\n";
+                fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+                fprintf aout "\tmovq 24(%%r14), %%r13\n";
+                fprintf aout "\tmovq $percent.ld, %%rdi\n";
+                fprintf aout "\tmovl %%r13d, %%eax\n";
+                fprintf aout "\tcdqe\n";
+                fprintf aout "\tmovq %%rax, %%rsi\n";
+                fprintf aout "\tmovl $0, %%eax\n";
+                fprintf aout "\tandq $-16, %%rsp\n";
+                fprintf aout "\tcall printf\n";
+                fprintf aout "\tmov %%r12, %%r13\n"
+            | "IO", "out_string" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $16, %%rsp\n";
+                fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+                fprintf aout "\tmovq 24(%%r14), %%r13\n";
+                fprintf aout "\tmovq %%r13, %%rdi\n";
+                fprintf aout "\tandq $-16, %%rsp\n";
+                fprintf aout "\tcall cooloutstr\n";
+                fprintf aout "\tmovq %%r12, %%r13\n"
+            | "Object", "abort" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $16, %%rsp\n";
+                fprintf aout "\tmovq $abort.string, %%rdi\n";
+                fprintf aout "\tcall cooloutstr\n";
+                fprintf aout "\tmovl $0, %%edi\n";
+                fprintf aout "\tcall exit\n"
+            | "Object", "copy" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $16, %%rsp\n";
 
-              fprintf aout "\tmovq $8, %%rsi\n";
-              fprintf aout "\tmovq %%r14, %%rdi\n";
-              fprintf aout "\tandq $-16, %%rsp\n";
-              fprintf aout "\tcall calloc\n";
-              fprintf aout "\tmovq %%rax, %%r13\n";
-              fprintf aout "\tpushq %%r13\n";
+                fprintf aout "\tmovq 8(%%r12), %%r14\n";
 
-              (* copy loop *)
-              fprintf aout ".globl l1\nl1:\n";
-              fprintf aout "\tcmpq $0, %%r14\n";
-              fprintf aout "\tje l2\n";
-              fprintf aout "\tmovq 0(%%r12), %%r15\n";
-              fprintf aout "\tmovq %%r15, 0(%%r13)\n";
-              fprintf aout "\tmovq $8, %%r15\n";
-              fprintf aout "\taddq %%r15, %%r12\n";
-              fprintf aout "\taddq %%r15, %%r13\n";
-              fprintf aout "\tmovq $1, %%r15\n";
-              fprintf aout "\tsubq %%r15, %%r14\n";
-              fprintf aout "\tjmp l1\n";
-              fprintf aout ".globl l2\nl2:\n";
+                fprintf aout "\tmovq $8, %%rsi\n";
+                fprintf aout "\tmovq %%r14, %%rdi\n";
+                fprintf aout "\tandq $-16, %%rsp\n";
+                fprintf aout "\tcall calloc\n";
+                fprintf aout "\tmovq %%rax, %%r13\n";
+                fprintf aout "\tpushq %%r13\n";
 
-              (* done with copy loop *)
-              fprintf aout "\tpopq %%r13\n"
-          | "Object", "type_name" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $16, %%rsp\n";
-              fprintf aout "\tpushq %%rbp\n";
-              fprintf aout "\tpushq %%r12\n";
-              fprintf aout "\tmovq $String..new, %%r14\n";
-              fprintf aout "\tcall *%%r14\n";
-              fprintf aout "\tpopq %%r12\n";
-              fprintf aout "\tpopq %%rbp\n";
-              fprintf aout "\tmovq 16(%%r12), %%r14\n";
-              fprintf aout "\tmovq 0(%%r14), %%r14\n";
-              fprintf aout "\tmovq %%r14, 24(%%r13)\n"
-          | "String", "length" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $16, %%rsp\n";
-              call_new aout "Int";
-              fprintf aout "\tmovq %%r13, %%r14\n";
-              fprintf aout "\tmovq 24(%%r12), %%r13\n";
-              fprintf aout "\tmovq %%r13, %%rdi\n";
-              fprintf aout "\tmovl $0, %%eax\n";
-              fprintf aout "\tcall coolstrlen\n";
-              fprintf aout "\tmovq %%rax, %%r13\n";
-              fprintf aout "\tmovq %%r13, 24(%%r14)\n";
-              fprintf aout "\tmovq %%r14, %%r13\n"
-          | "String", "concat" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $16, %%rsp\n";
-              fprintf aout "\t\n## init new string for return\n";
-              call_new aout "String";
-              fprintf aout "\tmovq %%r13, %%r15\n";
-              fprintf aout "\tmovq 24(%%rbp), %%r14\n";
-              fprintf aout "\tmovq 24(%%r14), %%r14\n";
-              fprintf aout "\tmovq 24(%%r12), %%r13\n";
+                (* copy loop *)
+                fprintf aout ".globl l1\nl1:\n";
+                fprintf aout "\tcmpq $0, %%r14\n";
+                fprintf aout "\tje l2\n";
+                fprintf aout "\tmovq 0(%%r12), %%r15\n";
+                fprintf aout "\tmovq %%r15, 0(%%r13)\n";
+                fprintf aout "\tmovq $8, %%r15\n";
+                fprintf aout "\taddq %%r15, %%r12\n";
+                fprintf aout "\taddq %%r15, %%r13\n";
+                fprintf aout "\tmovq $1, %%r15\n";
+                fprintf aout "\tsubq %%r15, %%r14\n";
+                fprintf aout "\tjmp l1\n";
+                fprintf aout ".globl l2\nl2:\n";
 
-              fprintf aout "\t\n## rdi is caller (LHS)\n";
-              fprintf aout "\tmovq %%r13, %%rdi\n";
-              fprintf aout "\tmovq %%r14, %%rsi\n";
-              fprintf aout "\tcall coolstrcat\n";
-              fprintf aout "\tmovq %%rax, %%r13\n";
-              fprintf aout "\tmovq %%r13, 24(%%r15)\n";
-              fprintf aout "\tmovq %%r15, %%r13\n"
-          | "String", "substr" ->
-              fprintf aout "\tmovq 16(%%rbp), %%r12\n";
-              fprintf aout "\tsubq $16, %%rsp\n";
-              fprintf aout "\tpushq %%rbp\n";
-              fprintf aout "\tpushq %%r12\n";
-              fprintf aout "\tmovq $String..new, %%r14\n";
-              fprintf aout "\tcall *%%r14\n";
-              fprintf aout "\tpopq %%r12\n";
-              fprintf aout "\tpopq %%rbp\n";
-              fprintf aout "\tmovq %%r13, %%r15\n";
-              fprintf aout "\tmovq 32(%%rbp), %%r14\n";
-              fprintf aout "\tmovq 24(%%r14), %%r14\n";
-              fprintf aout "\tmovq 24(%%rbp), %%r13\n";
-              fprintf aout "\tmovq 24(%%r13), %%r13\n";
-              fprintf aout "\tmovq 24(%%r12), %%r12\n";
-              fprintf aout "\tmovq %%r12, %%rdi\n";
-              fprintf aout "\tmovq %%r13, %%rsi ## start index\n ";
-              fprintf aout "\tmovq %%r14, %%rdx ## length\n ";
-              fprintf aout "\tcall coolsubstr\n";
-              fprintf aout "\tmovq %%rax, %%r13\n";
-              fprintf aout "\tcmpq $0, %%r13\n";
-              fprintf aout "\tjne l3\n";
-              fprintf aout "\tmovq $substr.error.string, %%r13\n";
-              fprintf aout "\tmovq %%r13, %%rdi\n";
-              fprintf aout "\tcall cooloutstr\n";
-              fprintf aout "\tmovl $0, %%edi\n";
-              fprintf aout "\tcall exit\n";
-              fprintf aout ".globl l3\n";
-              fprintf aout "l3:\n";
-              fprintf aout "\tmovq %%r13, 24(%%r15)\n";
-              fprintf aout "\tmovq %%r15, %%r13\n"
-          | _ ->
-              fprintf aout "\n## MISSING INTERNAL METHOD DEF for %s.%s\n\n"
-                cname mname);
+                (* done with copy loop *)
+                fprintf aout "\tpopq %%r13\n"
+            | "Object", "type_name" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $16, %%rsp\n";
+                fprintf aout "\tpushq %%rbp\n";
+                fprintf aout "\tpushq %%r12\n";
+                fprintf aout "\tmovq $String..new, %%r14\n";
+                fprintf aout "\tcall *%%r14\n";
+                fprintf aout "\tpopq %%r12\n";
+                fprintf aout "\tpopq %%rbp\n";
+                fprintf aout "\tmovq 16(%%r12), %%r14\n";
+                fprintf aout "\tmovq 0(%%r14), %%r14\n";
+                fprintf aout "\tmovq %%r14, 24(%%r13)\n"
+            | "String", "length" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $16, %%rsp\n";
+                call_new aout "Int";
+                fprintf aout "\tmovq %%r13, %%r14\n";
+                fprintf aout "\tmovq 24(%%r12), %%r13\n";
+                fprintf aout "\tmovq %%r13, %%rdi\n";
+                fprintf aout "\tmovl $0, %%eax\n";
+                fprintf aout "\tcall coolstrlen\n";
+                fprintf aout "\tmovq %%rax, %%r13\n";
+                fprintf aout "\tmovq %%r13, 24(%%r14)\n";
+                fprintf aout "\tmovq %%r14, %%r13\n"
+            | "String", "concat" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $16, %%rsp\n";
+                fprintf aout "\t\n## init new string for return\n";
+                call_new aout "String";
+                fprintf aout "\tmovq %%r13, %%r15\n";
+                fprintf aout "\tmovq 24(%%rbp), %%r14\n";
+                fprintf aout "\tmovq 24(%%r14), %%r14\n";
+                fprintf aout "\tmovq 24(%%r12), %%r13\n";
 
-          fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n")
+                fprintf aout "\t\n## rdi is caller (LHS)\n";
+                fprintf aout "\tmovq %%r13, %%rdi\n";
+                fprintf aout "\tmovq %%r14, %%rsi\n";
+                fprintf aout "\tcall coolstrcat\n";
+                fprintf aout "\tmovq %%rax, %%r13\n";
+                fprintf aout "\tmovq %%r13, 24(%%r15)\n";
+                fprintf aout "\tmovq %%r15, %%r13\n"
+            | "String", "substr" ->
+                fprintf aout "\tmovq 16(%%rbp), %%r12\n";
+                fprintf aout "\tsubq $16, %%rsp\n";
+                fprintf aout "\tpushq %%rbp\n";
+                fprintf aout "\tpushq %%r12\n";
+                fprintf aout "\tmovq $String..new, %%r14\n";
+                fprintf aout "\tcall *%%r14\n";
+                fprintf aout "\tpopq %%r12\n";
+                fprintf aout "\tpopq %%rbp\n";
+                fprintf aout "\tmovq %%r13, %%r15\n";
+                fprintf aout "\tmovq 32(%%rbp), %%r14\n";
+                fprintf aout "\tmovq 24(%%r14), %%r14\n";
+                fprintf aout "\tmovq 24(%%rbp), %%r13\n";
+                fprintf aout "\tmovq 24(%%r13), %%r13\n";
+                fprintf aout "\tmovq 24(%%r12), %%r12\n";
+                fprintf aout "\tmovq %%r12, %%rdi\n";
+                fprintf aout "\tmovq %%r13, %%rsi ## start index\n ";
+                fprintf aout "\tmovq %%r14, %%rdx ## length\n ";
+                fprintf aout "\tcall coolsubstr\n";
+                fprintf aout "\tmovq %%rax, %%r13\n";
+                fprintf aout "\tcmpq $0, %%r13\n";
+                fprintf aout "\tjne l3\n";
+                fprintf aout "\tmovq $substr.error.string, %%r13\n";
+                fprintf aout "\tmovq %%r13, %%rdi\n";
+                fprintf aout "\tcall cooloutstr\n";
+                fprintf aout "\tmovl $0, %%edi\n";
+                fprintf aout "\tcall exit\n";
+                fprintf aout ".globl l3\n";
+                fprintf aout "l3:\n";
+                fprintf aout "\tmovq %%r13, 24(%%r15)\n";
+                fprintf aout "\tmovq %%r15, %%r13\n"
+            | _ ->
+                fprintf aout "\n## MISSING INTERNAL METHOD DEF for %s.%s\n\n"
+                  cname mname);
+
+            fprintf aout "\tmovq %%rbp, %%rsp\n\tpopq %%rbp\n\tret\n"))
         non_inherited_methods)
     internal_impl_map;
 

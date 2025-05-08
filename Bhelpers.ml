@@ -16,6 +16,7 @@ let attrLocations : (string, string * int) Hashtbl.t = Hashtbl.create 255
 let class_tags : (string, int) Hashtbl.t = Hashtbl.create 255
 let inheritance : (string, string) Hashtbl.t = Hashtbl.create 255
 let ident_tac : (name, tac_expr) Hashtbl.t = Hashtbl.create 255
+let dispatch_list : (string * string, bool) Hashtbl.t = Hashtbl.create 255
 
 let currNode : cfg_node ref =
   ref

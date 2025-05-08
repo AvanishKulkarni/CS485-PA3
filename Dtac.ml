@@ -393,7 +393,11 @@ let tac (a : exp_kind) (var : name) (cname : name) (mname : name) =
           {
             label = exitlbl;
             comment = exitcomm;
-            blocks = [ TAC_End_While(tac_expr_to_name bexp); TAC_Assign_Default (var, "Object") ];
+            blocks =
+              [
+                TAC_End_While (tac_expr_to_name bexp);
+                TAC_Assign_Default (var, "Object");
+              ];
             true_branch = None;
             false_branch = None;
             parent_branches = [ Some predNode; Some bodyNode ];
