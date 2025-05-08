@@ -18,8 +18,13 @@ function run_tests() {
     cool --out "$1"_ref --x86 "$1.cl"
     
     ./main "$1.cl-type" > test_error.txt
+    size=0
     if [ -f "$1.s" ]; then
         gcc --no-pie --static "$1.s"
+        gcc --no-pie --static "$1"_ref.s -o ref.out
+        prog_size=$(stat -c %s a.out)
+        ref_size=$(stat -c %s ref.out)
+        size=$(printf "%.10f\n" $(echo "$prog_size / $ref_size" | bc -l))
         if [ -e "$1.cl-input" ]; then
             cool "$1.cl" < "$1.cl-input" > reference_output.txt
             ./a.out < "$1.cl-input" > test_output.txt
@@ -32,11 +37,14 @@ function run_tests() {
     else
         diff -b -B -w reference_error.txt test_error.txt > /dev/null
     fi
+    
     if [ $? -eq 0 ]; then
         echo -e "\e[32;1mPassed\e[0m $1"
+        echo "Z = $size"
         return 0
     else 
         echo -e "\e[31;1mFailed\e[0m $1"
+        echo "Z = $size"
         return 1
     fi
 }
