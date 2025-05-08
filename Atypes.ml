@@ -89,6 +89,7 @@ type tac_instr =
   | TAC_Internal of label
   | TAC_Case of label * label * case_elem list * cfg_node list
   | TAC_End_While of label
+  | TAC_SSA_Merge of label list
 
 and tac_expr = TAC_Variable of label
 and label = string
