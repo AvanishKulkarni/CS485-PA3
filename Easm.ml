@@ -514,6 +514,9 @@ let asm_output fname cltype () =
     | TAC_Return label -> fprintf fout "ret\n"
     | TAC_Remove_Let var ->
         fprintf fout "\n\t## Propagating Let return down\n";
+        if (Hashtbl.mem envtable var) then (
+          Hashtbl.remove envtable var;
+        );
         if !stackOffset <= -32 then (
           fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 16);
           stackOffset := !stackOffset + 16;

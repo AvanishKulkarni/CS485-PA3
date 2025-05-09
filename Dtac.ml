@@ -228,11 +228,11 @@ let tac (a : exp_kind) (var : name) (cname : name) (mname : name) =
             match binit with
             (* [Let-Init] *)
             | Some binit ->
-                let var = fresh_var () in
+                let var = sprintf "let_%s" vname in
                 Hashtbl.add ident_tac vname (TAC_Variable var);
-                let i, ta = convert binit.exp_kind var cname mname in
+                let i, ta = convert binit.exp_kind (fresh_var ()) cname mname in
                 retTacInstr :=
-                  List.append !retTacInstr [ TAC_Assign_Assign (var, ta) ];
+                  List.append !retTacInstr [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ];
                 !currNode.blocks <-
                   !currNode.blocks
                   @ [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ];
@@ -240,7 +240,7 @@ let tac (a : exp_kind) (var : name) (cname : name) (mname : name) =
                 removeScope := List.append !removeScope [ TAC_Remove_Let var ]
             (* [Let-No-Init] *)
             | None ->
-                let var = fresh_var () in
+                let var = sprintf "let_%s" vname  in
                 Hashtbl.add ident_tac vname (TAC_Variable var);
                 retTacInstr :=
                   List.append !retTacInstr
