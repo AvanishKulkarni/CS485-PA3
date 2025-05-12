@@ -20,28 +20,29 @@ let rec ssa (tacNode : cfg_node option) (ssaNode : cfg_node) (defined : label li
         visitedNodes := cfgNode.label :: !visitedNodes;
 
         let ssa_instr = cfgNode.blocks in
-        List.fold_left ( fun tac ->
+        List.iter ( fun tac ->
           let new_instr : tac_instr =
           match tac with
           | TAC_Assign_Identifier (var, i) ->
               let new_i = (match Hashtbl.mem ssa_names i with 
-              | true -> i ^ Hashtbl.find ssa_names i
+              | true -> i ^ string_of_int (Hashtbl.find ssa_names i)
               | false -> i)
               in
               let new_var = (match Hashtbl.mem ssa_names var with 
               | true -> 
-                Hashtbl.add ssa_names ((Hashtbl.find ssa_names var)+1);
+                Hashtbl.add ssa_names var ((Hashtbl.find ssa_names var)+1);
                 var ^ (string_of_int ((Hashtbl.find ssa_names var)))
               | false -> 
-                Hashtbl.add ssa_names 1;
+                Hashtbl.add ssa_names var 1;
                 var ^ (string_of_int 1)
               )
               in
               TAC_Assign_Identifier(new_var, new_i)
-          | _ ->
-            TAC_Comment ("Hello")
-            (* TAC_Assign_Int (var, i) ->
-              
+          
+          | TAC_Assign_Int (var, i) ->
+
+            TAC_Assign_Int(var, i)
+           (*   
           | TAC_Assign_Bool (var, i) ->
               
           | TAC_Assign_String (var, i) ->
@@ -93,8 +94,9 @@ let rec ssa (tacNode : cfg_node option) (ssaNode : cfg_node) (defined : label li
           | TAC_Case (var, i, caseList, tacList) ->
               
           | TAC_End_While _ ->
-              
-          | _ ->  *)
+              *)
+          | _ ->
+            TAC_Comment ("Hello")
           in
           ssaNode.blocks <- ssaNode.blocks @ [new_instr]
         ) ssa_instr;
@@ -107,8 +109,8 @@ let rec ssa (tacNode : cfg_node option) (ssaNode : cfg_node) (defined : label li
             let ssa_instr = vars @ ssa_instr in
             ());
 
-        ssa cfgNode.true_branch;
-        ssa cfgNode.false_branch)
+        ssa cfgNode.true_branch ssaNode [];
+        ssa cfgNode.false_branch ssaNode [])
 
 let optimize (startNode : cfg_node) =
   ( (* 
