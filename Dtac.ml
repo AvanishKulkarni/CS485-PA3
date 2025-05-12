@@ -229,8 +229,8 @@ let tac (a : exp_kind) (var : name) (cname : name) (mname : name) =
             (* [Let-Init] *)
             | Some binit ->
                 let var = sprintf "let_%s" vname in
-                Hashtbl.add ident_tac vname (TAC_Variable var);
                 let i, ta = convert binit.exp_kind (fresh_var ()) cname mname in
+                Hashtbl.add ident_tac vname (TAC_Variable var);
                 retTacInstr :=
                   List.append !retTacInstr [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ];
                 !currNode.blocks <-
