@@ -325,7 +325,7 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
              in
              ssaNode.true_branch <- Some (tac_ssa cfgNode.true_branch ssa_true));
 
-         match cfgNode.true_branch with
+         match cfgNode.false_branch with
          | None -> ()
          | Some node ->
              let ssa_false : ssa_node =
@@ -561,21 +561,21 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
               {
                 label = node.label;
                 comment = node.comment;
-                blocks = [];
+                blocks = [TAC_Comment("HELLO WORLD")];
                 true_branch = None;
                 false_branch = None;
                 parent_branches = [ Some tacNode ];
               }
             in
             tacNode.true_branch <- Some (ssa_tac cfgNode.true_branch tac_true));
-        match cfgNode.true_branch with
+        match cfgNode.false_branch with
         | None -> tacNode
         | Some node ->
             let tac_false : cfg_node =
               {
                 label = node.label;
                 comment = node.comment;
-                blocks = [];
+                blocks = [TAC_Comment("HELLO WORLD")];
                 true_branch = None;
                 false_branch = None;
                 parent_branches = [ Some tacNode ];
@@ -592,6 +592,10 @@ let optimize (startNode : cfg_node) : cfg_node =
   while dce (Some(startNode)) StringSet.empty do (
     visitedNodes := [];
   ) done; *)
+  Hashtbl.clear ssa_names;
+  Hashtbl.clear ssa_reverse;
+  ssaVisitedNodes := [];
+  printf "Original # of instr: %d\n" (List.length startNode.blocks);
   let (ssaStart : ssa_node) =
     {
       label = startNode.label;
@@ -606,6 +610,10 @@ let optimize (startNode : cfg_node) : cfg_node =
     }
   in
   let ssaStart = tac_ssa (Some startNode) ssaStart in
+  (match ssaStart.true_branch with
+  | None -> printf "Failed to generate a true_branch\n";
+  | Some(_) -> printf "Success generating a true branch\n";);
+  printf "# of instructions after ssa: %d\n" (List.length ssaStart.blocks);
   printf "TAC->SSA DONE!\n";
   let (tacStart : cfg_node) =
     {
@@ -619,5 +627,7 @@ let optimize (startNode : cfg_node) : cfg_node =
   in
   ssaVisitedNodes := [];
   let tacStart = ssa_tac (Some ssaStart) tacStart in
+  printf "# of instructions after going back to tac: %d\n" (List.length tacStart.blocks);
+
   printf "SSA->TAC DONE!\n\n";
   tacStart
