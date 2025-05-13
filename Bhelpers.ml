@@ -18,16 +18,17 @@ let inheritance : (string, string) Hashtbl.t = Hashtbl.create 255
 let ident_tac : (name, tac_expr) Hashtbl.t = Hashtbl.create 255
 let dispatch_list : (string * string, bool) Hashtbl.t = Hashtbl.create 255
 let ssa_names : (string, int) Hashtbl.t = Hashtbl.create 255
+let ssa_reverse : (string, string) Hashtbl.t = Hashtbl.create 1023
 
 let currNode : cfg_node ref =
   ref
     {
       label = TAC_Label "";
       comment = TAC_Comment "";
-      blocks = [];
-      true_branch = None;
-      false_branch = None;
-      parent_branches = [];
+      blocks : tac_instr list = [];
+      true_branch : cfg_node option = None;
+      false_branch : cfg_node option = None;
+      parent_branches : cfg_node option list = [];
     }
 
 let fresh_var () =

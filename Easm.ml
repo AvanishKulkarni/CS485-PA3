@@ -514,9 +514,7 @@ let asm_output fname cltype () =
     | TAC_Return label -> fprintf fout "ret\n"
     | TAC_Remove_Let var ->
         fprintf fout "\n\t## Propagating Let return down\n";
-        if (Hashtbl.mem envtable var) then (
-          Hashtbl.remove envtable var;
-        );
+        if Hashtbl.mem envtable var then Hashtbl.remove envtable var;
         if !stackOffset <= -32 then (
           fprintf fout "\tmovq %d(%%rbp), %%r14\n" (!stackOffset + 16);
           stackOffset := !stackOffset + 16;
@@ -610,7 +608,7 @@ let asm_output fname cltype () =
         if
           (not (List.mem cfgNode.label !visitedNodes))
           && List.for_all
-               (fun x ->
+               (fun (x : cfg_node option) ->
                  match x with
                  | Some x -> List.mem x.label !visitedNodes
                  | None -> true)
@@ -755,12 +753,12 @@ let asm_output fname cltype () =
                   in
                   currNode := node;
                   visitedNodes := [];
-                  let _, _ =
-                    tac aexp.exp_kind (fresh_var ()) cname
+                  let start =
+                    tac node aexp.exp_kind (fresh_var ()) cname
                       (sprintf "attr_%s" aname)
                   in
                   let stackOffset = ref 0 in
-                  output_asm aout stackOffset (Some node);
+                  output_asm aout stackOffset (Some start);
                   let stackOffset =
                     if !stackOffset = 0 then 0 else !stackOffset + 16
                   in
@@ -819,9 +817,9 @@ let asm_output fname cltype () =
           currNode := node;
           visitedNodes := [];
           labelCount := 1;
-          let _, _ = tac body.exp_kind (fresh_var ()) cname mname in
+          let start = tac node body.exp_kind (fresh_var ()) cname mname in
           let stackOffset = ref 0 in
-          output_asm dummy_out stackOffset (Some node))
+          output_asm dummy_out stackOffset (Some start))
         non_inherited_methods)
     user_impl_map;
 
@@ -880,9 +878,9 @@ let asm_output fname cltype () =
             visitedNodes := [];
             labelCount := 1;
             (* TODO find the AST for the method and then run it *)
-            let _, _ = tac body.exp_kind (fresh_var ()) cname mname in
+            let start = tac node body.exp_kind (fresh_var ()) cname mname in
             let stackOffset = ref 0 in
-            output_asm aout stackOffset (Some node);
+            output_asm aout stackOffset (Some start);
             let stackOffset =
               if !stackOffset = 0 then 0 else !stackOffset + 16
             in

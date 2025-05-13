@@ -4,8 +4,10 @@ open Bhelpers
 open DAoptimize
 module StringSet = Set.Make (String)
 
-let tac (a : exp_kind) (var : name) (cname : name) (mname : name) =
-  let rec merge_node curr_node join_node =
+let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
+    (mname : name) =
+  let rec merge_node (curr_node : cfg_node option) (join_node : cfg_node option)
+      =
     match curr_node with
     | Some curr_node -> (
         match curr_node.true_branch with
@@ -232,7 +234,8 @@ let tac (a : exp_kind) (var : name) (cname : name) (mname : name) =
                 let i, ta = convert binit.exp_kind (fresh_var ()) cname mname in
                 Hashtbl.add ident_tac vname (TAC_Variable var);
                 retTacInstr :=
-                  List.append !retTacInstr [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ];
+                  List.append !retTacInstr
+                    [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ];
                 !currNode.blocks <-
                   !currNode.blocks
                   @ [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ];
@@ -240,7 +243,7 @@ let tac (a : exp_kind) (var : name) (cname : name) (mname : name) =
                 removeScope := List.append !removeScope [ TAC_Remove_Let var ]
             (* [Let-No-Init] *)
             | None ->
-                let var = sprintf "let_%s" vname  in
+                let var = sprintf "let_%s" vname in
                 Hashtbl.add ident_tac vname (TAC_Variable var);
                 retTacInstr :=
                   List.append !retTacInstr
@@ -461,10 +464,12 @@ let tac (a : exp_kind) (var : name) (cname : name) (mname : name) =
     | _ -> ([], TAC_Variable "None")
   in
   (* make copy of currNode *)
-  let startNode = !currNode in
-  let tlist, texp = convert a var cname mname in
-  optimize startNode;
-  (tlist, texp)
+  let _, _ = convert a var cname mname in
+  (* currNode := optimize startNode;
+  (tlist, texp) *)
+  printf "Running optimizations in %s.%s\n" cname mname;
+  optimize startNode
+(* startNode *)
 
 let tac_output_pa4c1 (fname : name) cltype =
   let output_tac_helper fout tac_instructions =
@@ -525,14 +530,14 @@ let tac_output_pa4c1 (fname : name) cltype =
     | _ -> fprintf fout ""
   in
   let tacVisitedNodes = ref [] in
-  let rec output_tac fout cfgNode =
+  let rec output_tac fout (cfgNode : cfg_node option) =
     match cfgNode with
     | None -> ()
     | Some cfgNode ->
         if
           (not (List.mem cfgNode.label !tacVisitedNodes))
           && List.for_all
-               (fun x ->
+               (fun (x : cfg_node option) ->
                  match x with
                  | Some x -> List.mem x.label !tacVisitedNodes
                  | None -> true)
@@ -585,9 +590,7 @@ let tac_output_pa4c1 (fname : name) cltype =
         }
       in
       currNode := node;
-      let tac_instructions, tac_var =
-        tac mexp.exp_kind (fresh_var ()) cname mname
-      in
-      output_tac fout (Some node);
-      fprintf fout "return %s\n" (tac_expr_to_name tac_var)
+      let start = tac node mexp.exp_kind (fresh_var ()) cname mname in
+      output_tac fout (Some (start : cfg_node))
+      (* fprintf fout "return %s\n" (tac_expr_to_name tac_var) *)
   | _ -> fprintf fout ""

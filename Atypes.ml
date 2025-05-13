@@ -106,3 +106,15 @@ and cfg_node = {
   mutable false_branch : cfg_node option;
   mutable parent_branches : cfg_node option list;
 }
+
+and ssa_node = {
+  label : tac_instr;
+  comment : tac_instr;
+  mutable blocks : tac_instr list;
+  mutable true_branch : ssa_node option;
+  mutable false_branch : ssa_node option;
+  mutable parent_branches : ssa_node list;
+  mutable grandparent : ssa_node option;
+  mutable defined_vars : label list;
+  mutable ssa_names_copy : (string, int) Hashtbl.t;
+}
