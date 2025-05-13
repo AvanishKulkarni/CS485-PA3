@@ -194,9 +194,9 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                     | TAC_Assign_ArithNegate (_, _) ->
                         TAC_Assign_ArithNegate (new_var, TAC_Variable new_i1)
                     | TAC_Assign_BoolNegate (_, _) ->
-                        TAC_Assign_ArithNegate (new_var, TAC_Variable new_i1)
+                      TAC_Assign_BoolNegate (new_var, TAC_Variable new_i1)
                     | TAC_Assign_NullCheck (_, _) ->
-                        TAC_Assign_ArithNegate (new_var, TAC_Variable new_i1)
+                      TAC_Assign_NullCheck (new_var, TAC_Variable new_i1)
                     | _ -> TAC_Comment "")
                 | ( TAC_Assign_Static_FunctionCall (var, mname, cname, args_vars)
                   | TAC_Assign_Dynamic_FunctionCall
@@ -469,9 +469,9 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
                   | TAC_Assign_ArithNegate (_, _) ->
                       TAC_Assign_ArithNegate (new_var, TAC_Variable new_i1)
                   | TAC_Assign_BoolNegate (_, _) ->
-                      TAC_Assign_ArithNegate (new_var, TAC_Variable new_i1)
+                    TAC_Assign_BoolNegate (new_var, TAC_Variable new_i1)
                   | TAC_Assign_NullCheck (_, _) ->
-                      TAC_Assign_ArithNegate (new_var, TAC_Variable new_i1)
+                    TAC_Assign_NullCheck (new_var, TAC_Variable new_i1)
                   | _ -> TAC_Comment "")
               | ( TAC_Assign_Static_FunctionCall (var, mname, cname, args_vars)
                 | TAC_Assign_Dynamic_FunctionCall (var, mname, cname, args_vars)
