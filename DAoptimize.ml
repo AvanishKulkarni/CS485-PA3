@@ -35,7 +35,7 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
       then (
         printf "Converting from TAC->SSA\n";
         ssaVisitedNodes := cfgNode.label :: !ssaVisitedNodes;
-        (match List.length cfgNode.parent_branches with
+        (match List.length ssaNode.parent_branches with
         | 0 | 1 -> printf "No parent :(\n"
         | _ -> (
             let join =
