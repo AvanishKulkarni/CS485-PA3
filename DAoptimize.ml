@@ -550,7 +550,7 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
                   TAC_Comment "Hello" (* DO CASES LATER *)
               | TAC_End_While var ->
                   let new_var =
-                    match Hashtbl.mem ssa_names var with
+                    match Hashtbl.mem ssa_reverse var with
                     | true -> Hashtbl.find ssa_reverse var
                     | false -> var
                   in
