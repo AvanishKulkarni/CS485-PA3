@@ -628,7 +628,12 @@ let rec dce (node : ssa_node option) =
   | Some node ->
       if not (List.mem node.label !dceVisitedNodes) then (
         dceVisitedNodes := node.label :: !dceVisitedNodes;
-        let dce_instr = node.blocks in
+        let instr_list = node.blocks in
+        let kill = node.defined_vars in
+        let gen =
+          List.map (fun instr -> match instr with a -> a) instr_list
+        in
+        List.iter (fun dead -> printf "%s\n" dead) kill;
 
         (match node.true_branch with
         | None -> ()
