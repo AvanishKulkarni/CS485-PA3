@@ -1,0 +1,15 @@
+The control flow graph of the program is generated as we traverse the TAC IR, creating one for every method. The CFG nodes each track TAC instructions, parent branch(es), and a true and false branch respectively. Control flow TAC instructions are included within the node - not outputted as the CFG is traversed. This was done because the CFG was grafted onto the original pure TAC representation. 
+
+We use two major intermediate representations - TAC and SSA. Once the CFG (with TAC instructions in its body) is constructed, we convert it to an equivalent CFG that has SSA instructions within its body instead. This new CFG node type tracks a few additional things - namely the grandparent node, defined variables, and a copy of the hashtable tracking SSA variable names. Once this new CFG is created we iterate through it to perform optimizations. A thing to note is that both node types use the same TAC instructions, simplifying the conversion.
+
+We do a liveness analysis on the CFG using the “gen-kill” style. The “defined variables” tracked by the SSA nodes, along with iterating through the SSA instructions is used to generate the ‘out’ set. Each node is recursively traversed with the ‘out’ set passed through as the ‘in’ set for each descendant node. With the ‘out’ set generated, SSA instructions not interacting with anything in the ‘out’ set are filtered out from the SSA node. 
+
+The compiler then performs the inverse of the TAC to SSA conversion, reverting the CFG made of SSA nodes back to the TAC node CFG and discarding the extra unnecessary information. This is simplified by the SSA node still using the same TAC instructions. 
+
+Another peephole optimization removed situations where registers were written to memory and then immediately loaded again into registers. They were analyzed and removed, deleting redundant mov instructions. 
+
+With the new, optimized CFG, we do a ‘dry-run’ code generation call, outputting to /dev/null. During this call, the names of methods actually dispatched are tracked in a hashtable. Then code generation is done again, this time actually writing to file. Method bodies that are not in the previously generated hashtable are not printed, allowing for frequently inherited but unused methods like those in the default classes to be ignored. This is technically a form of liveness analysis and dead code elimination.
+
+benchmark1.cl - This benchmark tests whether the compiler can recognize a simple conditional branch that should be ignored. If this is not detected and removed, the benchmark then tests constant folding with a large nested arithmetic expression (~35000 instructions). The dead branch contains this expression. 
+
+benchmark2.cl - This benchmark tests for algebraic identities and method inlining. It has a sum(a, b) method which sums the input. It runs it multiple times, and then modifies the return values with algebraic identities (×1, +0, etc) or nullifies them by multiplying by zero. 
