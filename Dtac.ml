@@ -346,7 +346,7 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
         let prevNode = !currNode in
         (* entry/predicate setup *)
         let predvar = fresh_var () in
-        let notpredvar = fresh_var () in
+        (* let notpredvar = fresh_var () in *)
         currNode :=
           {
             label = predlbl;
@@ -359,7 +359,7 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
         prevNode.true_branch <- Some !currNode;
         let pinstr, pexp = convert pred.exp_kind predvar cname mname in
         (* let notpred = TAC_Assign_BoolNegate (notpredvar, pexp) in *)
-        let bexit = TAC_Branch_True (notpredvar, exitlblname) in
+        let bexit = TAC_Branch_True (predvar, exitlblname) in
         !currNode.blocks <- !currNode.blocks @ [ bexit ];
         let predNode = !currNode in
 
@@ -467,63 +467,7 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
   optimize startNode
 
 let tac_output_pa4c1 (fname : name) cltype =
-  let output_tac_helper fout tac_instructions =
-    match tac_instructions with
-    | TAC_Assign_Identifier (var, i) -> fprintf fout "%s <- %s\n" var i
-    | TAC_Assign_Int (var, i) -> fprintf fout "%s <- int %s\n" var i
-    | TAC_Assign_Bool (var, i) -> fprintf fout "%s <- bool %s\n" var i
-    | TAC_Assign_String (var, i) -> fprintf fout "%s <- string\n%s\n" var i
-    | TAC_Assign_Plus (var, i1, i2) ->
-        fprintf fout "%s <- + %s %s\n" var (tac_expr_to_name i1)
-          (tac_expr_to_name i2)
-    | TAC_Assign_Minus (var, i1, i2) ->
-        fprintf fout "%s <- - %s %s\n" var (tac_expr_to_name i1)
-          (tac_expr_to_name i2)
-    | TAC_Assign_Times (var, i1, i2) ->
-        fprintf fout "%s <- * %s %s\n" var (tac_expr_to_name i1)
-          (tac_expr_to_name i2)
-    | TAC_Assign_Div (var, i1, i2) ->
-        fprintf fout "%s <- / %s %s\n" var (tac_expr_to_name i1)
-          (tac_expr_to_name i2)
-    | TAC_Assign_Lt (var, i1, i2) ->
-        fprintf fout "%s <- < %s %s\n" var (tac_expr_to_name i1)
-          (tac_expr_to_name i2)
-    | TAC_Assign_Le (var, i1, i2) ->
-        fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1)
-          (tac_expr_to_name i2)
-    | TAC_Assign_Eq (var, i1, i2) ->
-        fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1)
-          (tac_expr_to_name i2)
-    | TAC_Assign_ArithNegate (var, i) ->
-        fprintf fout "%s <- ~ %s\n" var (tac_expr_to_name i)
-    | TAC_Assign_BoolNegate (var, i) ->
-        fprintf fout "%s <- not %s\n" var (tac_expr_to_name i)
-    | TAC_Assign_NullCheck (var, i) ->
-        fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
-    | TAC_Assign_Static_FunctionCall (var, mname, stype, args_vars) ->
-        fprintf fout "%s <- call %s\n" var mname;
-        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
-        fprintf fout "\n"
-    | TAC_Assign_Dynamic_FunctionCall (var, mname, caller, args_vars) ->
-        fprintf fout "%s <- call %s" var mname;
-        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
-        fprintf fout "\n"
-    | TAC_Assign_Self_FunctionCall (var, mname, cname, args_vars) ->
-        fprintf fout "%s <- call %s" var mname;
-        List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
-        fprintf fout "\n"
-    | TAC_Assign_New (var, name) -> fprintf fout "%s <- new %s\n" var name
-    | TAC_Assign_Default (var, name) ->
-        fprintf fout "%s <- default %s\n" var name
-    | TAC_Assign_Assign (var, i) ->
-        fprintf fout "%s <- %s\n" var (tac_expr_to_name i)
-    | TAC_Branch_True (cond, label) -> fprintf fout "bt %s %s\n" cond label
-    | TAC_Comment comment -> fprintf fout "comment %s\n" comment
-    | TAC_Jump label -> fprintf fout "jmp %s\n" label
-    | TAC_Label label -> fprintf fout "label %s\n" label
-    | TAC_Return label -> fprintf fout "ret %s\n" label
-    | _ -> fprintf fout ""
-  in
+  
   let tacVisitedNodes = ref [] in
   let rec output_tac fout (cfgNode : cfg_node option) =
     match cfgNode with
