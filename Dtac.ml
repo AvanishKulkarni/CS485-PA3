@@ -464,7 +464,7 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
   in
   (* make copy of currNode *)
   let _, _ = convert a var cname mname in
-  optimize startNode
+  (* optimize *) startNode
 
 let tac_output_pa4c1 (fname : name) cltype =
   
