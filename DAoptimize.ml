@@ -81,6 +81,7 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
           let ssa_instr = cfgNode.blocks in
           List.iter
             (fun tac ->
+              let casePhis = ref [] in
               let new_instr : tac_instr =
                 match tac with
                 | TAC_Assign_Identifier (var, i) ->
@@ -319,7 +320,7 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                     TAC_End_While new_var
                 | _ -> TAC_Comment ""
               in
-              ssaNode.blocks <- ssaNode.blocks @ [ new_instr ])
+              ssaNode.blocks <- ssaNode.blocks @ [ new_instr ] @ !casePhis)
             ssa_instr;
           (* insert merge function for every variable in procedure if multiple parents *)
           redef_vars := List.sort_uniq compare !redef_vars;
