@@ -83,3 +83,4 @@ let tac_type_to_name t =
   | TAC_End_While _ -> "TAC_End_While"
   | TAC_SSA_Merge _ -> "TAC_SSA_Merge"
   | SSA_Phi _ -> "SSA_Phi"
+  | TAC_SSA_Case _ -> "TAC_SSA_Case"

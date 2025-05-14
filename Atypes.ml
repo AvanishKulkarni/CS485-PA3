@@ -91,7 +91,7 @@ type tac_instr =
   | TAC_End_While of label
   | TAC_SSA_Merge of label list
   | SSA_Phi of label * label * label
-  | TAC_SSA_Case of label * label * case_elem list  * ssa_node list
+  | TAC_SSA_Case of label * label * case_elem list * ssa_node list
 
 and tac_expr = TAC_Variable of label
 and label = string
@@ -111,6 +111,7 @@ and cfg_node = {
 and ssa_node = {
   ssa_label : tac_instr;
   ssa_comment : tac_instr;
+  la_name : string;
   mutable blocks : tac_instr list;
   mutable true_branch : ssa_node option;
   mutable false_branch : ssa_node option;

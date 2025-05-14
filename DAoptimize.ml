@@ -13,6 +13,7 @@ let ssaVisitedNodes = ref []
 let dceVisitedNodes = ref []
 let ssaLabeledNodes : (tac_instr, ssa_node) Hashtbl.t = Hashtbl.create 255
 let tacLabeledNodes : (tac_instr, cfg_node) Hashtbl.t = Hashtbl.create 255
+let block_num = ref 1
 
 let rec find_join (node1 : ssa_node option) (node2 : ssa_node option) :
     ssa_node option =
@@ -28,28 +29,15 @@ let rec find_join (node1 : ssa_node option) (node2 : ssa_node option) :
 
 let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
   match tacNode with
-  | None ->
-      (* printf "No node found\n"; *)
-      (* printf "No node found\n"; *)
-      ssaNode
+  | None -> ssaNode
   | Some cfgNode ->
-      (* printf "Node found in TAC->SSA\n"; *)
-      (* printf "Node found in TAC->SSA\n"; *)
       if
         (not (List.mem cfgNode.label !ssaVisitedNodes))
-        (* && (List.for_all
-             (fun x ->
-               match (x : cfg_node option) with
-               | Some x -> List.mem x.label !ssaVisitedNodes
-               | None -> true)
-             cfgNode.parent_branches) *)
         && not (Hashtbl.mem ssaLabeledNodes cfgNode.label)
       then (
-        (* printf "Converting from TAC->SSA\n"; *)
-        (* printf "Converting from TAC->SSA\n"; *)
         ssaVisitedNodes := cfgNode.label :: !ssaVisitedNodes;
         (match List.length ssaNode.parent_branches with
-        | 0 | 1 -> (* printf "No parent :(\n" *) ()
+        | 0 | 1 -> ()
         | _ -> (
             let join =
               find_join
@@ -96,8 +84,6 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
               let new_instr : tac_instr =
                 match tac with
                 | TAC_Assign_Identifier (var, i) ->
-                    (* printf "Converting Identifier to SSA\n"; *)
-                    (* printf "Converting Identifier to SSA\n"; *)
                     let new_i =
                       match Hashtbl.mem ssa_names i with
                       | true -> i ^ string_of_int (Hashtbl.find ssa_names i)
@@ -117,7 +103,6 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                     Hashtbl.add ssa_reverse new_var var;
                     TAC_Assign_Identifier (new_var, new_i)
                 | TAC_Assign_Int (var, i) ->
-                    (* printf "Converting Int to SSA\n"; *)
                     let new_var =
                       match Hashtbl.mem ssa_names var with
                       | true -> var ^ string_of_int (Hashtbl.find ssa_names var)
@@ -125,7 +110,6 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                     in
                     TAC_Assign_Int (new_var, i)
                 | TAC_Assign_Bool (var, i) ->
-                    (* printf "Converting Bool to SSA\n"; *)
                     let new_var =
                       match Hashtbl.mem ssa_names var with
                       | true -> var ^ string_of_int (Hashtbl.find ssa_names var)
@@ -133,7 +117,6 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                     in
                     TAC_Assign_Bool (new_var, i)
                 | TAC_Assign_String (var, i) ->
-                    (* printf "Converting String to SSA\n"; *)
                     let new_var =
                       match Hashtbl.mem ssa_names var with
                       | true -> var ^ string_of_int (Hashtbl.find ssa_names var)
@@ -295,41 +278,43 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                     in
                     TAC_Remove_Let new_var
                 | TAC_Case (var, i, caseList, tacList) ->
-                  let new_var = 
-                    match Hashtbl.mem ssa_names var with
+                    let new_var =
+                      match Hashtbl.mem ssa_names var with
                       | true -> var ^ string_of_int (Hashtbl.find ssa_names var)
-                      | false ->
-                          var
+                      | false -> var
                     in
-                    let new_i = 
+                    let new_i =
                       match Hashtbl.mem ssa_names i with
                       | true -> i ^ string_of_int (Hashtbl.find ssa_names i)
                       | false -> i
                     in
-                  let newSSAList = 
-                  List.map2 (fun (Case_Elem ((_,var_name), _, _)) node ->
-                    let newSSA : ssa_node =
-                      {
-                        ssa_label = node.label;
-                        ssa_comment = node.comment;
-                        blocks = [];
-                        true_branch = None;
-                        false_branch = None;
-                        parent_branches = [ ];
-                        grandparent = None;
-                        defined_vars = [];
-                        ssa_names_copy = Hashtbl.create 1;
-                      }
+                    let newSSAList =
+                      List.map2
+                        (fun (Case_Elem ((_, var_name), _, _)) node ->
+                          let newSSA : ssa_node =
+                            {
+                              ssa_label = node.label;
+                              ssa_comment = node.comment;
+                              la_name = string_of_int !block_num;
+                              blocks = [];
+                              true_branch = None;
+                              false_branch = None;
+                              parent_branches = [];
+                              grandparent = None;
+                              defined_vars = [];
+                              ssa_names_copy = Hashtbl.create 1;
+                            }
+                          in
+                          block_num := !block_num + 1;
+                          tac_ssa (Some node) newSSA)
+                        caseList tacList
                     in
-                    tac_ssa (Some node) newSSA 
-                    ) caseList tacList in
-                  TAC_SSA_Case(new_var, new_i, caseList, newSSAList)
+                    TAC_SSA_Case (new_var, new_i, caseList, newSSAList)
                 | TAC_End_While var ->
                     let new_var =
                       match Hashtbl.mem ssa_names var with
                       | true -> var ^ string_of_int (Hashtbl.find ssa_names var)
-                      | false ->
-                          var
+                      | false -> var
                     in
                     TAC_End_While new_var
                 | _ -> TAC_Comment ""
@@ -353,8 +338,9 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
          | Some node ->
              let ssa_false : ssa_node =
                {
-                ssa_label = node.label;
-                ssa_comment = node.comment;
+                 ssa_label = node.label;
+                 ssa_comment = node.comment;
+                 la_name = string_of_int !block_num;
                  blocks = [];
                  true_branch = None;
                  false_branch = None;
@@ -364,6 +350,7 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                  ssa_names_copy = Hashtbl.create 1;
                }
              in
+             block_num := !block_num + 1;
              ssaNode.false_branch <-
                Some (tac_ssa cfgNode.false_branch ssa_false));
          match cfgNode.true_branch with
@@ -371,8 +358,9 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
          | Some node ->
              let ssa_true : ssa_node =
                {
-                ssa_label = node.label;
-                ssa_comment = node.comment;
+                 ssa_label = node.label;
+                 ssa_comment = node.comment;
+                 la_name = string_of_int !block_num;
                  blocks = [];
                  true_branch = None;
                  false_branch = None;
@@ -382,29 +370,20 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                  ssa_names_copy = Hashtbl.create 1;
                }
              in
+             block_num := !block_num + 1;
              ssaNode.true_branch <- Some (tac_ssa cfgNode.true_branch ssa_true));
-        Hashtbl.add ssaLabeledNodes ssaNode.ssa_label (ssaNode);
-               ssaNode)
-      else 
-        if (Hashtbl.mem ssaLabeledNodes ssaNode.ssa_label) then Hashtbl.find ssaLabeledNodes ssaNode.ssa_label
-        else
-        ssaNode
+        Hashtbl.add ssaLabeledNodes ssaNode.ssa_label ssaNode;
+        ssaNode)
+      else if Hashtbl.mem ssaLabeledNodes ssaNode.ssa_label then
+        Hashtbl.find ssaLabeledNodes ssaNode.ssa_label
+      else ssaNode
 
 (*reset visitedNodes before calling ssa_tac*)
 let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
   match ssaNode with
   | None -> tacNode
   | Some cfgNode ->
-      (* printf "Node found in SSA->TAC\n"; *)
-      (* printf "Node found in SSA->TAC\n"; *)
-      if
-        (* (not (List.mem cfgNode.ssa_label !ssaVisitedNodes))
-        (* && (List.for_all
-             (fun x -> List.mem x.label !ssaVisitedNodes)
-             cfgNode.parent_branches) *)
-        && *) not (Hashtbl.mem tacLabeledNodes tacNode.label)
-      then (
-        (* printf "Converting from SSA->TAC\n"; *)
+      if not (Hashtbl.mem tacLabeledNodes tacNode.label) then (
         ssaVisitedNodes := cfgNode.ssa_label :: !ssaVisitedNodes;
         let ssa_instr = cfgNode.blocks in
         List.iter
@@ -587,31 +566,33 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
                   in
                   TAC_Remove_Let new_var
               | TAC_SSA_Case (var, i, caseList, ssaList) ->
-                let new_i =
-                  match Hashtbl.mem ssa_reverse i with
-                  | true -> Hashtbl.find ssa_reverse i
-                  | false -> i
-                in
-                let new_var =
-                  match Hashtbl.mem ssa_reverse var with
-                  | true -> Hashtbl.find ssa_reverse var
-                  | false -> var
-                in
-                let tacList = 
-                  List.map (fun node ->
-                    let newTac : cfg_node =
-                      {
-                        label = node.ssa_label;
-                        comment = node.ssa_comment;
-                        blocks = [];
-                        true_branch = None;
-                        false_branch = None;
-                        parent_branches = [];
-                      }
-                    in
-                    ssa_tac (Some node) newTac
-                    ) ssaList in
-                  TAC_Case(new_var, new_i, caseList, tacList)
+                  let new_i =
+                    match Hashtbl.mem ssa_reverse i with
+                    | true -> Hashtbl.find ssa_reverse i
+                    | false -> i
+                  in
+                  let new_var =
+                    match Hashtbl.mem ssa_reverse var with
+                    | true -> Hashtbl.find ssa_reverse var
+                    | false -> var
+                  in
+                  let tacList =
+                    List.map
+                      (fun node ->
+                        let newTac : cfg_node =
+                          {
+                            label = node.ssa_label;
+                            comment = node.ssa_comment;
+                            blocks = [];
+                            true_branch = None;
+                            false_branch = None;
+                            parent_branches = [];
+                          }
+                        in
+                        ssa_tac (Some node) newTac)
+                      ssaList
+                  in
+                  TAC_Case (new_var, new_i, caseList, tacList)
               | TAC_End_While var ->
                   let new_var =
                     match Hashtbl.mem ssa_reverse var with
@@ -624,22 +605,22 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
             tacNode.blocks <- tacNode.blocks @ [ new_instr ])
           ssa_instr;
 
-          (match cfgNode.false_branch with
-          | None -> ()
-          | Some node ->
-              let tac_false : cfg_node =
-                {
-                  label = node.ssa_label;
-                  comment = node.ssa_comment;
-                  blocks = [];
-                  true_branch = None;
-                  false_branch = None;
-                  parent_branches = [ Some tacNode ];
-                }
-              in
-  
-              tacNode.false_branch <-
-                Some (ssa_tac cfgNode.false_branch tac_false););
+        (match cfgNode.false_branch with
+        | None -> ()
+        | Some node ->
+            let tac_false : cfg_node =
+              {
+                label = node.ssa_label;
+                comment = node.ssa_comment;
+                blocks = [];
+                true_branch = None;
+                false_branch = None;
+                parent_branches = [ Some tacNode ];
+              }
+            in
+
+            tacNode.false_branch <-
+              Some (ssa_tac cfgNode.false_branch tac_false));
         (match cfgNode.true_branch with
         | None -> ()
         | Some node ->
@@ -679,42 +660,49 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
         | Some false_branch -> dce (Some false_branch)) *)
 
 (* dead code elimination *)
-let rec dce (node : ssa_node option) =
+let rec dce (node : ssa_node option) (in_set : string list) =
   match node with
   | None -> ()
   | Some node ->
       if not (List.mem node.ssa_label !dceVisitedNodes) then (
         dceVisitedNodes := node.ssa_label :: !dceVisitedNodes;
         let instr_list = node.blocks in
-        let kill = node.defined_vars in
-        let gen =
-          List.map (fun instr -> match instr with a -> a) instr_list
+        (* variables assigned to in this node *)
+        let kill_set = node.defined_vars in
+        (* variables used in this node *)
+        let gen_set =
+          List.map (fun instr -> tac_type_to_name instr) instr_list
         in
-        List.iter (fun dead -> printf "%s\n" dead) kill;
+        let set_diff lst1 lst2 =
+          List.filter (fun x -> not (List.mem x lst2)) lst1
+        in
+        let set_union lst1 lst2 =
+          lst1 @ List.filter (fun x -> not (List.mem x lst1)) lst2
+        in
+
+        let out_set = set_union gen_set (set_diff in_set kill_set) in
+        printf "\n\nBLOCK %s\n" node.la_name;
+        List.iter (fun x -> printf "%s\n" x) out_set;
 
         (match node.true_branch with
         | None -> ()
-        | Some true_branch -> dce (Some true_branch));
+        | Some true_branch -> dce (Some true_branch) out_set);
 
         match node.false_branch with
         | None -> ()
-        | Some false_branch -> dce (Some false_branch))
+        | Some false_branch -> dce (Some false_branch) out_set)
 
 let optimize (startNode : cfg_node) : cfg_node =
-  (* 
-  while dce (Some(startNode)) StringSet.empty do (
-    visitedNodes := [];
-  ) done; *)
   Hashtbl.clear ssa_names;
   Hashtbl.clear ssa_reverse;
   Hashtbl.clear ssaLabeledNodes;
   Hashtbl.clear tacLabeledNodes;
   ssaVisitedNodes := [];
-  (* printf "Original # of instr: %d\n" (List.length startNode.blocks); *)
   let (ssaStart : ssa_node) =
     {
       ssa_label = startNode.label;
       ssa_comment = startNode.comment;
+      la_name = string_of_int !block_num;
       blocks = [];
       true_branch = None;
       false_branch = None;
@@ -724,15 +712,11 @@ let optimize (startNode : cfg_node) : cfg_node =
       ssa_names_copy = Hashtbl.create 1;
     }
   in
+  block_num := !block_num + 1;
   let ssaStart = tac_ssa (Some startNode) ssaStart in
-  (* (match ssaStart.true_branch with
-  | None -> printf "Failed to generate a true_branch\n"
-  | Some _ -> printf "Success generating a true branch\n");
-  printf "# of instructions after ssa: %d\n" (List.length ssaStart.blocks);
-  printf "TAC->SSA DONE!\n"; *)
 
   (* do DCE *)
-  dce (Some ssaStart);
+  dce (Some ssaStart) [];
 
   let (tacStart : cfg_node) =
     {
@@ -746,8 +730,4 @@ let optimize (startNode : cfg_node) : cfg_node =
   in
   ssaVisitedNodes := [];
   let tacStart = ssa_tac (Some ssaStart) tacStart in
-  (* printf "# of instructions after going back to tac: %d\n"
-    (List.length tacStart.blocks); *)
-
-  (* printf "SSA->TAC DONE!\n\n"; *)
   tacStart

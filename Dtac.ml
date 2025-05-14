@@ -22,17 +22,14 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
     match a with
     | Identifier v -> (
         let _, name = v in
-        (* printf "%s\n" name; *)
         match Hashtbl.find_opt ident_tac name with
         | Some ta ->
-            (* printf "found -> returning %s\n" (tac_expr_to_name ta); *)
             !currNode.blocks <-
               !currNode.blocks
               @ [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ];
             ( [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ],
               TAC_Variable var )
         | None ->
-            (* printf "created %s \n" name; *)
             Hashtbl.add ident_tac name (TAC_Variable name);
             !currNode.blocks <-
               !currNode.blocks @ [ TAC_Assign_Identifier (var, name) ];
@@ -434,7 +431,9 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
             let bvar = fresh_var () in
             let branchNode =
               {
-                label = TAC_Internal (sprintf "case_%d_%d_%s" !caseErrorCounter i bname);
+                label =
+                  TAC_Internal
+                    (sprintf "case_%d_%d_%s" !caseErrorCounter i bname);
                 comment = TAC_Internal "";
                 blocks = [ TAC_Assign_Identifier (bvar, tac_expr_to_name ta) ];
                 true_branch = None;
@@ -465,11 +464,7 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
   in
   (* make copy of currNode *)
   let _, _ = convert a var cname mname in
-  (* currNode := optimize startNode;
-  (tlist, texp) *)
-  printf "Running optimizations in %s.%s\n" cname mname;
   optimize startNode
-(* startNode *)
 
 let tac_output_pa4c1 (fname : name) cltype =
   let output_tac_helper fout tac_instructions =
@@ -543,13 +538,10 @@ let tac_output_pa4c1 (fname : name) cltype =
                  | None -> true)
                cfgNode.parent_branches
         then (
-          (* printf "In cfg %s\n" (match cfgNode.label with | TAC_Label(label) -> label | _ -> "");
-        printf "StackOffset Before Blocks: %d\n" !stackOffset; *)
           tacVisitedNodes := cfgNode.label :: !tacVisitedNodes;
           output_tac_helper fout cfgNode.comment;
           output_tac_helper fout cfgNode.label;
           List.iter (fun x -> output_tac_helper fout x) cfgNode.blocks;
-          (* printf "StackOffset After Blocks: %d\n" !stackOffset; *)
           output_tac fout cfgNode.true_branch;
           (* stackOffset := !trueOffset; *)
           output_tac fout cfgNode.false_branch)
@@ -574,7 +566,7 @@ let tac_output_pa4c1 (fname : name) cltype =
       match x with
       | Attribute ((_, name), _, _) ->
           Hashtbl.add ident_tac name (TAC_Variable name)
-      | _ -> printf "")
+      | _ -> ())
     features;
   match first_method with
   | Method ((_, mname), _, _, mexp) ->
