@@ -73,14 +73,27 @@ let asm_output fname cltype () =
     match tac_instruction with
     | TAC_Assign_Identifier (var, i) ->
         fprintf fout "\n\t## assign identifier %s <- %s\n" var i;
+        let first =
         if not (Hashtbl.mem envtable i) then (
           stackOffset := !stackOffset + 16;
-          fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset;
-          Hashtbl.add envtable var (sprintf "%d(%%rbp)" !stackOffset))
-        else
+          (* fprintf fout "\tmovq %d(%%rbp), %%r14\n" !stackOffset; *)
+          Hashtbl.add envtable var (sprintf "%d(%%rbp)" !stackOffset);
+          sprintf "%d(%%rbp)" !stackOffset)
+        else (
           (* move top of stack *)
-          fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable i);
-        fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset;
+          (* fprintf fout "\tmovq %s, %%r14\n" (Hashtbl.find envtable i); *)
+          (Hashtbl.find envtable i)
+        )
+        in
+        let second = sprintf "%d(%%rbp)" !stackOffset in
+        (match first = second with
+        | true -> ()
+        | false -> (
+          fprintf fout "\tmovq %s, %%r14\n" first;
+          fprintf fout "\tmovq %%r14, %s\n" second;
+        )
+        );
+        (* fprintf fout "\tmovq %%r14, %d(%%rbp)\n" !stackOffset; *)
         stackOffset := !stackOffset - 16;
         fprintf fout ""
     | TAC_Assign_Int (var, i) ->
@@ -498,6 +511,11 @@ let asm_output fname cltype () =
             (Hashtbl.find envtable (tac_expr_to_name i));
         if Hashtbl.mem envtable var then
           fprintf fout "\tmovq %%r14, %s\n" (Hashtbl.find envtable var)
+        else (
+          Hashtbl.add envtable var (sprintf "%d(%%rbp)" !stackOffset);
+          stackOffset := !stackOffset - 16;
+          fprintf fout "\tmovq %%r14, %s\n" (Hashtbl.find envtable var);
+        )
     | TAC_Branch_True (cond, label) ->
         fprintf fout "\n\t## conditional jump\n";
         if not (Hashtbl.mem envtable cond) then (
