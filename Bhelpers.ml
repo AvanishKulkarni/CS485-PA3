@@ -108,6 +108,8 @@ let get_tac_rhs instr =
   | TAC_Assign_New (lhs, rhs) | TAC_Assign_Default (lhs, rhs) -> [ rhs ]
   | TAC_Assign_Assign (lhs, rhs) -> [ tac_expr_to_name rhs ]
   | TAC_SSA_Case _ -> []
+  | TAC_Branch_True (lhs, _) -> [lhs]
+  | TAC_Return (ret) -> [ret]
   | _ -> []
 
 let get_tac_lhs instr =
@@ -138,3 +140,73 @@ let get_tac_lhs instr =
   | TAC_Assign_Assign (lhs, rhs) -> [ lhs ]
   | SSA_Phi (lhs, _, _) -> [ lhs ]
   | _ -> []
+
+let rec checkUsed (kill_set : bconst list) (node : ssa_node) : bconst list =
+  let used = List.concat ((List.map (fun i -> get_tac_rhs i)) node.blocks) in
+  let usedSet = List.filter (fun var -> List.mem var used) kill_set in
+  usedSet @ (
+    match node.true_branch with
+    | None -> []
+    | Some branch -> checkUsed kill_set branch
+  ) @ (
+    match node.false_branch with
+    | None -> []
+    | Some branch -> checkUsed kill_set branch
+  )
+
+let output_tac_helper fout tac_instructions =
+  match tac_instructions with
+  | TAC_Assign_Identifier (var, i) -> fprintf fout "%s <- %s\n" var i
+  | TAC_Assign_Int (var, i) -> fprintf fout "%s <- int %s\n" var i
+  | TAC_Assign_Bool (var, i) -> fprintf fout "%s <- bool %s\n" var i
+  | TAC_Assign_String (var, i) -> fprintf fout "%s <- string\n%s\n" var i
+  | TAC_Assign_Plus (var, i1, i2) ->
+      fprintf fout "%s <- + %s %s\n" var (tac_expr_to_name i1)
+        (tac_expr_to_name i2)
+  | TAC_Assign_Minus (var, i1, i2) ->
+      fprintf fout "%s <- - %s %s\n" var (tac_expr_to_name i1)
+        (tac_expr_to_name i2)
+  | TAC_Assign_Times (var, i1, i2) ->
+      fprintf fout "%s <- * %s %s\n" var (tac_expr_to_name i1)
+        (tac_expr_to_name i2)
+  | TAC_Assign_Div (var, i1, i2) ->
+      fprintf fout "%s <- / %s %s\n" var (tac_expr_to_name i1)
+        (tac_expr_to_name i2)
+  | TAC_Assign_Lt (var, i1, i2) ->
+      fprintf fout "%s <- < %s %s\n" var (tac_expr_to_name i1)
+        (tac_expr_to_name i2)
+  | TAC_Assign_Le (var, i1, i2) ->
+      fprintf fout "%s <- <= %s %s\n" var (tac_expr_to_name i1)
+        (tac_expr_to_name i2)
+  | TAC_Assign_Eq (var, i1, i2) ->
+      fprintf fout "%s <- = %s %s\n" var (tac_expr_to_name i1)
+        (tac_expr_to_name i2)
+  | TAC_Assign_ArithNegate (var, i) ->
+      fprintf fout "%s <- ~ %s\n" var (tac_expr_to_name i)
+  | TAC_Assign_BoolNegate (var, i) ->
+      fprintf fout "%s <- not %s\n" var (tac_expr_to_name i)
+  | TAC_Assign_NullCheck (var, i) ->
+      fprintf fout "%s <- isvoid %s\n" var (tac_expr_to_name i)
+  | TAC_Assign_Static_FunctionCall (var, mname, stype, args_vars) ->
+      fprintf fout "%s <- call %s\n" var mname;
+      List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+      fprintf fout "\n"
+  | TAC_Assign_Dynamic_FunctionCall (var, mname, caller, args_vars) ->
+      fprintf fout "%s <- call %s" var mname;
+      List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+      fprintf fout "\n"
+  | TAC_Assign_Self_FunctionCall (var, mname, cname, args_vars) ->
+      fprintf fout "%s <- call %s" var mname;
+      List.iter (fun x -> fprintf fout " %s" (tac_expr_to_name x)) args_vars;
+      fprintf fout "\n"
+  | TAC_Assign_New (var, name) -> fprintf fout "%s <- new %s\n" var name
+  | TAC_Assign_Default (var, name) ->
+      fprintf fout "%s <- default %s\n" var name
+  | TAC_Assign_Assign (var, i) ->
+      fprintf fout "%s <- %s\n" var (tac_expr_to_name i)
+  | TAC_Branch_True (cond, label) -> fprintf fout "bt %s %s\n" cond label
+  | TAC_Comment comment -> fprintf fout "comment %s\n" comment
+  | TAC_Jump label -> fprintf fout "jmp %s\n" label
+  | TAC_Label label -> fprintf fout "label %s\n" label
+  | TAC_Return label -> fprintf fout "ret %s\n" label
+  | _ -> fprintf fout ""

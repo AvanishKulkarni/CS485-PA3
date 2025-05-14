@@ -689,6 +689,14 @@ let rec dce (node : ssa_node ref) (in_set : string list) =
     let out_set =
       List.sort_uniq compare (set_union gen_set (set_diff in_set kill_set))
     in
+    let branchUses = (
+      match node.true_branch with
+      | None -> []
+      | Some branch -> checkUsed kill_set branch
+    ) @ (match node.false_branch with
+    | None -> []
+    | Some branch -> checkUsed kill_set branch) in
+    let out_set = List.sort_uniq compare (out_set @ branchUses) in
     printf "\n\nBLOCK %s\n" node.la_name;
     printf "in_set: ";
     List.iter (printf "%s ") in_set;
@@ -702,32 +710,42 @@ let rec dce (node : ssa_node ref) (in_set : string list) =
     printf "out_set: ";
     List.iter (printf "%s ") out_set;
     printf "\n";
-
     (* remove dead tac_instr - remove any ssa instructions that 
         do not interact with the out_set, meaning they are irrelevant.
         
         also need to ignore irrelevant tac_instr, like control flow 
         instructions and others *)
+    printf "\n\nssa length before dce %d\n" (List.length node.blocks);
+  List.iter (fun x -> printf "%s: " (tac_type_to_name x); output_tac_helper stdout x) node.blocks;
     let dce_instr_list =
       List.filter
         (fun instr ->
           let lhs = get_tac_lhs instr in
           let vars = lhs in
           (* return true if anything in vars is in out_set *)
-          let live = List.exists (fun x -> 
-            (match instr with 
-            | TAC_Assign_Dynamic_FunctionCall _ | TAC_Assign_Static_FunctionCall _ | TAC_Assign_Self_FunctionCall _-> true
-            | _ -> false
-            ) ||
-            (List.mem x out_set)) vars in
-          printf "%s : " (tac_type_to_name instr);
-          List.iter (fun x -> printf "%s " x) vars;
-          printf" %s\n" (string_of_bool live);
+          let live = 
+            match instr with 
+            | TAC_Assign_Dynamic_FunctionCall _ | TAC_Assign_Static_FunctionCall _ | TAC_Assign_Self_FunctionCall _
+            | TAC_Remove_Let _ | TAC_End_While _
+            | TAC_Branch_True _ | TAC_Comment _ | TAC_Label _ | TAC_Jump _
+            | TAC_Return _ | TAC_Internal _ | TAC_SSA_Case  _-> true
+            | _ ->
+            List.exists (fun x -> 
+             List.mem x out_set || List.mem x gen_set
+            ) vars in
+          (match live with
+          | false ->
+            printf "%s : " (tac_type_to_name instr);
+            List.iter (fun x -> printf "%s " x) vars;
+            printf" %s\n" (string_of_bool live);
+          | true -> printf "";);
           live)
         instr_list
     in
     node.blocks <- dce_instr_list;
-
+    printf "\nssa length after dce %d\n" (List.length node.blocks);
+    List.iter (fun x -> printf "%s: " (tac_type_to_name x); output_tac_helper stdout x) node.blocks;
+    printf "\n";
     (* traverse *)
     (match node.true_branch with
     | None -> ()
@@ -768,11 +786,7 @@ let optimize (startNode : cfg_node) : cfg_node =
 
   (* do DCE *)
   let ssaStart = ref ssaStart in
-  printf "ssa length before %d\n" (List.length !ssaStart.blocks);
-  List.iter (fun x -> printf "%s\n" (tac_type_to_name x)) !ssaStart.blocks;
   dce ssaStart [];
-  printf "ssa length after %d\n" (List.length !ssaStart.blocks);
-  List.iter (fun x -> printf "%s\n" (tac_type_to_name x)) !ssaStart.blocks;
 
   let (tacStart : cfg_node) =
     {
