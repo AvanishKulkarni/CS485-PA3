@@ -710,13 +710,19 @@ let rec dce (node : ssa_node ref) (in_set : string list) =
         instructions and others *)
     let dce_instr_list =
       List.filter
-        (fun x ->
-          let rhs = get_tac_rhs x in
-          let lhs = get_tac_lhs x in
-          let vars = lhs @ rhs in
+        (fun instr ->
+          let lhs = get_tac_lhs instr in
+          let vars = lhs in
           (* return true if anything in vars is in out_set *)
-          let live = List.exists (fun x -> List.mem x out_set) vars in
-
+          let live = List.exists (fun x -> 
+            (match instr with 
+            | TAC_Assign_Dynamic_FunctionCall _ | TAC_Assign_Static_FunctionCall _ | TAC_Assign_Self_FunctionCall _-> true
+            | _ -> false
+            ) ||
+            (List.mem x out_set)) vars in
+          printf "%s : " (tac_type_to_name instr);
+          List.iter (fun x -> printf "%s " x) vars;
+          printf" %s\n" (string_of_bool live);
           live)
         instr_list
     in
