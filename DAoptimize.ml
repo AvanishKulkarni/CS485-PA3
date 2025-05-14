@@ -100,7 +100,7 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                           Hashtbl.add ssa_names var 1;
                           var ^ string_of_int 1
                     in
-                    redef_vars := !redef_vars @ [ var ];
+                    redef_vars := !redef_vars @ [ new_var ];
                     Hashtbl.add ssa_reverse new_var var;
                     TAC_Assign_Identifier (new_var, new_i)
                 | TAC_Assign_Int (var, i) ->
@@ -256,7 +256,7 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
 
                           var ^ string_of_int 1
                     in
-                    redef_vars := !redef_vars @ [ var ];
+                    redef_vars := !redef_vars @ [ new_var ];
                     Hashtbl.add ssa_reverse new_var var;
                     TAC_Assign_Assign (new_var, TAC_Variable new_i)
                 | TAC_Branch_True (cond, label) ->
@@ -661,37 +661,79 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
         | Some false_branch -> dce (Some false_branch)) *)
 
 (* dead code elimination *)
-let rec dce (node : ssa_node option) (in_set : string list) =
-  match node with
-  | None -> ()
-  | Some node ->
-      if not (List.mem node.ssa_label !dceVisitedNodes) then (
-        dceVisitedNodes := node.ssa_label :: !dceVisitedNodes;
-        let instr_list = node.blocks in
-        (* variables assigned to in this node *)
-        let kill_set = node.defined_vars in
-        (* variables used in this node *)
-        let gen_set =
-          List.map (fun instr -> tac_type_to_name instr) instr_list
-        in
-        let set_diff lst1 lst2 =
-          List.filter (fun x -> not (List.mem x lst2)) lst1
-        in
-        let set_union lst1 lst2 =
-          lst1 @ List.filter (fun x -> not (List.mem x lst1)) lst2
-        in
+let rec dce (node : ssa_node ref) (in_set : string list) =
+  let node = !node in
+  if not (List.mem node.ssa_label !dceVisitedNodes) then (
+    dceVisitedNodes := node.ssa_label :: !dceVisitedNodes;
+    let instr_list = node.blocks in
+    (* variables assigned to in this node *)
+    let kill_set = node.defined_vars in
+    (* variables used in this node *)
+    let gen_set =
+      List.concat ((List.map (fun i -> get_tac_rhs i)) instr_list)
+    in
+    (* let gen_set =
+          List.map
+            (fun x ->
+              match Hashtbl.find_opt ssa_reverse x with
+              | Some var -> var
+              | None -> x)
+            rhs
+        in *)
+    let set_diff lst1 lst2 =
+      List.filter (fun x -> not (List.mem x lst2)) lst1
+    in
+    let set_union lst1 lst2 =
+      lst1 @ List.filter (fun x -> not (List.mem x lst1)) lst2
+    in
+    let out_set =
+      List.sort_uniq compare (set_union gen_set (set_diff in_set kill_set))
+    in
+    printf "\n\nBLOCK %s\n" node.la_name;
+    printf "in_set: ";
+    List.iter (printf "%s ") in_set;
+    printf "\n";
+    printf "gen_set: ";
+    List.iter (printf "%s ") gen_set;
+    printf "\n";
+    printf "kill_set: ";
+    List.iter (printf "%s ") kill_set;
+    printf "\n";
+    printf "out_set: ";
+    List.iter (printf "%s ") out_set;
+    printf "\n";
 
-        let out_set = set_union gen_set (set_diff in_set kill_set) in
-        printf "\n\nBLOCK %s\n" node.la_name;
-        List.iter (fun x -> printf "%s\n" x) out_set;
+    (* remove dead tac_instr - remove any ssa instructions that 
+        do not interact with the out_set, meaning they are irrelevant.
+        
+        also need to ignore irrelevant tac_instr, like control flow 
+        instructions and others *)
+    let dce_instr_list =
+      List.filter
+        (fun x ->
+          let rhs = get_tac_rhs x in
+          let lhs = get_tac_lhs x in
+          let vars = lhs @ rhs in
+          (* return true if anything in vars is in out_set *)
+          let live = List.exists (fun x -> List.mem x out_set) vars in
 
-        (match node.true_branch with
-        | None -> ()
-        | Some true_branch -> dce (Some true_branch) out_set);
+          live)
+        instr_list
+    in
+    node.blocks <- dce_instr_list;
 
-        match node.false_branch with
-        | None -> ()
-        | Some false_branch -> dce (Some false_branch) out_set)
+    (* traverse *)
+    (match node.true_branch with
+    | None -> ()
+    | Some true_branch ->
+        let node_true_ref = ref true_branch in
+        dce node_true_ref out_set);
+
+    match node.false_branch with
+    | None -> ()
+    | Some false_branch ->
+        let node_false_ref = ref false_branch in
+        dce node_false_ref out_set)
 
 let optimize (startNode : cfg_node) : cfg_node =
   Hashtbl.clear ssa_names;
@@ -699,6 +741,8 @@ let optimize (startNode : cfg_node) : cfg_node =
   Hashtbl.clear ssaLabeledNodes;
   Hashtbl.clear tacLabeledNodes;
   ssaVisitedNodes := [];
+  dceVisitedNodes := [];
+  block_num := 1;
   let (ssaStart : ssa_node) =
     {
       ssa_label = startNode.label;
@@ -717,7 +761,12 @@ let optimize (startNode : cfg_node) : cfg_node =
   let ssaStart = tac_ssa (Some startNode) ssaStart in
 
   (* do DCE *)
-  dce (Some ssaStart) [];
+  let ssaStart = ref ssaStart in
+  printf "ssa length before %d\n" (List.length !ssaStart.blocks);
+  List.iter (fun x -> printf "%s\n" (tac_type_to_name x)) !ssaStart.blocks;
+  dce ssaStart [];
+  printf "ssa length after %d\n" (List.length !ssaStart.blocks);
+  List.iter (fun x -> printf "%s\n" (tac_type_to_name x)) !ssaStart.blocks;
 
   let (tacStart : cfg_node) =
     {
@@ -730,5 +779,5 @@ let optimize (startNode : cfg_node) : cfg_node =
     }
   in
   ssaVisitedNodes := [];
-  let tacStart = ssa_tac (Some ssaStart) tacStart in
+  let tacStart = ssa_tac (Some !ssaStart) tacStart in
   tacStart

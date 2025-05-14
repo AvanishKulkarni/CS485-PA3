@@ -84,3 +84,57 @@ let tac_type_to_name t =
   | TAC_SSA_Merge _ -> "TAC_SSA_Merge"
   | SSA_Phi _ -> "SSA_Phi"
   | TAC_SSA_Case _ -> "TAC_SSA_Case"
+
+let get_tac_rhs instr =
+  match instr with
+  | TAC_Assign_Identifier (lhs, rhs) -> [ rhs ]
+  | TAC_Assign_Plus (lhs, arg1, arg2)
+  | TAC_Assign_Minus (lhs, arg1, arg2)
+  | TAC_Assign_Times (lhs, arg1, arg2)
+  | TAC_Assign_Div (lhs, arg1, arg2)
+  | TAC_Assign_Lt (lhs, arg1, arg2)
+  | TAC_Assign_Le (lhs, arg1, arg2)
+  | TAC_Assign_Eq (lhs, arg1, arg2) ->
+      [ tac_expr_to_name arg1; tac_expr_to_name arg2 ]
+  | TAC_Assign_BoolNegate (lhs, rhs) | TAC_Assign_ArithNegate (lhs, rhs) ->
+      [ tac_expr_to_name rhs ]
+  | TAC_Assign_ObjectAlloc (lhs, rhs) | TAC_Assign_ObjectDefault (lhs, rhs) ->
+      [ rhs ]
+  | TAC_Assign_NullCheck (lhs, rhs) -> [ tac_expr_to_name rhs ]
+  | TAC_Assign_Dynamic_FunctionCall (_, _, _, args)
+  | TAC_Assign_Static_FunctionCall (_, _, _, args)
+  | TAC_Assign_Self_FunctionCall (_, _, _, args) ->
+      List.map (fun arg -> tac_expr_to_name arg) args
+  | TAC_Assign_New (lhs, rhs) | TAC_Assign_Default (lhs, rhs) -> [ rhs ]
+  | TAC_Assign_Assign (lhs, rhs) -> [ tac_expr_to_name rhs ]
+  | TAC_SSA_Case _ -> []
+  | _ -> []
+
+let get_tac_lhs instr =
+  match instr with
+  | TAC_Assign_Identifier (lhs, rhs) -> [ lhs ]
+  | TAC_Assign_Int (lhs, rhs)
+  | TAC_Assign_String (lhs, rhs)
+  | TAC_Assign_Bool (lhs, rhs) ->
+      [ lhs ]
+  | TAC_Assign_Plus (lhs, arg1, arg2)
+  | TAC_Assign_Minus (lhs, arg1, arg2)
+  | TAC_Assign_Times (lhs, arg1, arg2)
+  | TAC_Assign_Div (lhs, arg1, arg2)
+  | TAC_Assign_Lt (lhs, arg1, arg2)
+  | TAC_Assign_Le (lhs, arg1, arg2)
+  | TAC_Assign_Eq (lhs, arg1, arg2) ->
+      [ lhs ]
+  | TAC_Assign_BoolNegate (lhs, rhs) | TAC_Assign_ArithNegate (lhs, rhs) ->
+      [ lhs ]
+  | TAC_Assign_ObjectAlloc (lhs, rhs) | TAC_Assign_ObjectDefault (lhs, rhs) ->
+      [ lhs ]
+  | TAC_Assign_NullCheck (lhs, rhs) -> [ lhs ]
+  | TAC_Assign_Dynamic_FunctionCall (lhs, _, _, _)
+  | TAC_Assign_Static_FunctionCall (lhs, _, _, _)
+  | TAC_Assign_Self_FunctionCall (lhs, _, _, _) ->
+      [ lhs ]
+  | TAC_Assign_New (lhs, rhs) | TAC_Assign_Default (lhs, rhs) -> [ lhs ]
+  | TAC_Assign_Assign (lhs, rhs) -> [ lhs ]
+  | SSA_Phi (lhs, _, _) -> [ lhs ]
+  | _ -> []
