@@ -321,7 +321,7 @@ let rec tac_ssa (tacNode : cfg_node option) (ssaNode : ssa_node) : ssa_node =
                         ssa_names_copy = Hashtbl.create 1;
                       }
                     in
-                    tac_ssa (Some node) newSSA
+                    tac_ssa (Some node) newSSA 
                     ) caseList tacList in
                   TAC_SSA_Case(new_var, new_i, caseList, newSSAList)
                 | TAC_End_While var ->
@@ -398,11 +398,11 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
       (* printf "Node found in SSA->TAC\n"; *)
       (* printf "Node found in SSA->TAC\n"; *)
       if
-        (not (List.mem cfgNode.ssa_label !ssaVisitedNodes))
+        (* (not (List.mem cfgNode.ssa_label !ssaVisitedNodes))
         (* && (List.for_all
              (fun x -> List.mem x.label !ssaVisitedNodes)
              cfgNode.parent_branches) *)
-        && not (Hashtbl.mem tacLabeledNodes tacNode.label)
+        && *) not (Hashtbl.mem tacLabeledNodes tacNode.label)
       then (
         (* printf "Converting from SSA->TAC\n"; *)
         ssaVisitedNodes := cfgNode.ssa_label :: !ssaVisitedNodes;
@@ -631,7 +631,7 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
                 {
                   label = node.ssa_label;
                   comment = node.ssa_comment;
-                  blocks = [TAC_Comment("FALSE WORLD")];
+                  blocks = [];
                   true_branch = None;
                   false_branch = None;
                   parent_branches = [ Some tacNode ];
@@ -647,7 +647,7 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
               {
                 label = node.ssa_label;
                 comment = node.ssa_comment;
-                blocks = [TAC_Comment("TRUE WORLD")];
+                blocks = [];
                 true_branch = None;
                 false_branch = None;
                 parent_branches = [ Some tacNode ];

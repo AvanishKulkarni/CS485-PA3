@@ -429,12 +429,12 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
         caseErrorCounter := !caseErrorCounter + 1;
         let branchInstr = ref [] in
         let tempNode = !currNode in
-        List.iter
-          (fun (Case_Elem ((_, bname), (_, btype), exp)) ->
+        List.iteri
+          (fun i (Case_Elem ((_, bname), (_, btype), exp)) ->
             let bvar = fresh_var () in
             let branchNode =
               {
-                label = TAC_Internal "";
+                label = TAC_Internal (sprintf "case_%d_%d_%s" !caseErrorCounter i bname);
                 comment = TAC_Internal "";
                 blocks = [ TAC_Assign_Identifier (bvar, tac_expr_to_name ta) ];
                 true_branch = None;
