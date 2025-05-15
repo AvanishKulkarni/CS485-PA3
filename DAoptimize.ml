@@ -14,6 +14,8 @@ let dceVisitedNodes = ref []
 let ssaLabeledNodes : (tac_instr, ssa_node) Hashtbl.t = Hashtbl.create 255
 let tacLabeledNodes : (tac_instr, cfg_node) Hashtbl.t = Hashtbl.create 255
 let block_num = ref 1
+(* let deadCode = ref true *)
+(* let blockDead = ref false *)
 
 let rec find_join (node1 : ssa_node option) (node2 : ssa_node option) :
     ssa_node option =
@@ -660,7 +662,7 @@ let rec ssa_tac (ssaNode : ssa_node option) (tacNode : cfg_node) : cfg_node =
         | None -> ()
         | Some false_branch -> dce (Some false_branch)) *)
 
-(* dead code elimination *)
+(* dead code elimination *)(* 
 let rec dce (node : ssa_node ref) (in_set : string list) =
   let node = !node in
   if not (List.mem node.ssa_label !dceVisitedNodes) then (
@@ -728,10 +730,11 @@ let rec dce (node : ssa_node ref) (in_set : string list) =
             | TAC_Assign_Dynamic_FunctionCall _ | TAC_Assign_Static_FunctionCall _ | TAC_Assign_Self_FunctionCall _
             | TAC_Remove_Let _ | TAC_End_While _
             | TAC_Branch_True _ | TAC_Comment _ | TAC_Label _ | TAC_Jump _
-            | TAC_Return _ | TAC_Internal _ | TAC_SSA_Case  _-> true
+            | TAC_Return _ | TAC_Internal _ | TAC_SSA_Case  _
+            | TAC_Assign_Assign _ | TAC_Assign_Identifier _ | TAC_Assign_Default _-> true
             | _ ->
             List.exists (fun x -> 
-             List.mem x out_set || List.mem x gen_set
+             List.mem x out_set || List.mem x gen_set || x = "t$0"
             ) vars in
           (match live with
           | false ->
@@ -757,7 +760,78 @@ let rec dce (node : ssa_node ref) (in_set : string list) =
     | None -> ()
     | Some false_branch ->
         let node_false_ref = ref false_branch in
-        dce node_false_ref out_set)
+        dce node_false_ref out_set) *)
+
+let rec dce (node : ssa_node ref) =
+  let node = !node in
+  if not (List.mem node.ssa_label !dceVisitedNodes) then (
+    dceVisitedNodes := node.ssa_label :: !dceVisitedNodes;
+    let instr_list = node.blocks in
+    let gen_set =
+      List.concat ((List.map (fun i -> get_tac_rhs i)) instr_list)
+    in
+    let gen_set = gen_set @ (match (List.find_opt (fun x ->
+        List.length (get_tac_lhs x) > 0
+      ) (List.rev instr_list)) with
+      | Some instr -> get_tac_lhs instr
+      | None -> []
+      ) in
+    printf "\n\ngen_set: ";
+    List.iter (printf "%s ") gen_set;
+    printf "\n";
+    List.iter (fun x -> printf "%s: " (tac_type_to_name x); output_tac_helper stdout x) node.blocks;
+
+    let dce_instr_list =
+        List.filter
+          (fun instr ->
+            let lhs = get_tac_lhs instr in
+            let vars = lhs in
+            (* return true if anything in vars is in out_set *)
+            let live = 
+              (* match instr with 
+              | TAC_Assign_Dynamic_FunctionCall _ | TAC_Assign_Static_FunctionCall _ | TAC_Assign_Self_FunctionCall _
+              | TAC_Remove_Let _ | TAC_End_While _
+              | TAC_Branch_True _ | TAC_Comment _ | TAC_Label _ | TAC_Jump _
+              | TAC_Return _ | TAC_Internal _ | TAC_SSA_Case  _
+              | TAC_Assign_Assign _ | TAC_Assign_Identifier _ | TAC_Assign_Default _-> true
+              | _ ->
+              List.exists (fun x -> 
+                List.mem x gen_set || x = "t$0"
+              ) vars in *)
+              match instr with
+              | TAC_Assign_Int _ | TAC_Assign_String _ | TAC_Assign_Bool _ | TAC_Assign_Plus _
+              | TAC_Assign_Minus _ | TAC_Assign_Times _ | TAC_Assign_Div _ | TAC_Assign_Lt _
+              | TAC_Assign_Le _ | TAC_Assign_Eq _ | TAC_Assign_BoolNegate _ | TAC_Assign_ArithNegate _
+                -> List.exists (fun x -> 
+                  List.mem x gen_set || x = "t$0")vars 
+              | _ -> true  
+              in
+
+            (* (match live with
+            | false ->
+              printf "%s : " (tac_type_to_name instr);
+              List.iter (fun x -> printf "%s " x) vars;
+              printf" %s\n" (string_of_bool live);
+            | true -> printf "";); *)
+            live)
+          instr_list
+      in
+      (* if List.length instr_list != List.length dce_instr_list then(
+        blockDead := !blockDead || true;
+      ); *)
+      node.blocks <- dce_instr_list;
+      (match node.true_branch with
+        | None -> ()
+        | Some true_branch ->
+            let node_true_ref = ref true_branch in
+            dce node_true_ref);
+
+        (match node.false_branch with
+        | None -> ()
+        | Some false_branch ->
+            let node_false_ref = ref false_branch in
+            dce node_false_ref);
+  )
 
 let optimize (startNode : cfg_node) : cfg_node =
   Hashtbl.clear ssa_names;
@@ -786,7 +860,18 @@ let optimize (startNode : cfg_node) : cfg_node =
 
   (* do DCE *)
   let ssaStart = ref ssaStart in
-  dce ssaStart [];
+  (* dce ssaStart []; *)
+  (* while !deadCode do
+    (* blockDead := false; *)
+    (* dce ssaStart; *)
+    (* deadCode := false; *)
+  done; *)
+  dce ssaStart;
+  dce ssaStart;
+  dce ssaStart;
+  dce ssaStart;
+  dce ssaStart;
+  dce ssaStart;
 
   let (tacStart : cfg_node) =
     {

@@ -2,7 +2,7 @@ The control flow graph of the program is generated as we traverse the TAC IR, cr
 
 We use two major intermediate representations - TAC and SSA. Once the CFG (with TAC instructions in its body) is constructed, we convert it to an equivalent CFG that has SSA instructions within its body instead. This new CFG node type tracks a few additional things - namely the grandparent node, defined variables, and a copy of the hashtable tracking SSA variable names. Once this new CFG is created we iterate through it to perform optimizations. A thing to note is that both node types use the same TAC instructions, simplifying the conversion.
 
-We do a liveness analysis on the CFG using the “gen-kill” style. The “defined variables” tracked by the SSA nodes, along with iterating through the SSA instructions is used to generate the ‘out’ set. Each node is recursively traversed with the ‘out’ set passed through as the ‘in’ set for each descendant node. With the ‘out’ set generated, SSA instructions not interacting with anything in the ‘out’ set are filtered out from the SSA node. However this was not working by the time of submission, so it was disabled. 
+We do local dead code elimination on each basic block. To do this, we generate a list of all intermediate values that are used on the right hand side in tac, and we delete any intermediate values that are not used in any result, with an exception for the last tac instruction that could be used as a return value.
 
 The compiler then performs the inverse of the TAC to SSA conversion, reverting the CFG made of SSA nodes back to the TAC node CFG and discarding the extra unnecessary information. This is simplified by the SSA node still using the same TAC instructions. 
 

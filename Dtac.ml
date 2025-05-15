@@ -128,10 +128,11 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
           (fun e ->
             let i1, ta1 = convert e.exp_kind (fresh_var ()) cname mname in
             retTacInstr := List.append !retTacInstr i1;
-            propagateReturn :=
-              !propagateReturn @ [ TAC_Remove_Let (tac_expr_to_name ta1) ])
+            )
           rest_of_list;
-        let i1, _ = convert last_statement.exp_kind var cname mname in
+        let i1, ta1 = convert last_statement.exp_kind var cname mname in
+        List.iter (fun x -> propagateReturn :=
+        !propagateReturn @ [ TAC_Remove_Let (tac_expr_to_name ta1) ]) rest_of_list;
         retTacInstr := List.append !retTacInstr i1;
         !currNode.blocks <- !currNode.blocks @ !propagateReturn;
         (!retTacInstr @ !propagateReturn, TAC_Variable var)
@@ -237,7 +238,7 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
                   !currNode.blocks
                   @ [ TAC_Assign_Identifier (var, tac_expr_to_name ta) ];
                 let_vars := List.append !let_vars [ TAC_Variable var ];
-                removeScope := List.append !removeScope [ TAC_Remove_Let var ]
+                removeScope := List.append !removeScope [ TAC_Remove_Let (tac_expr_to_name ta) ]
             (* [Let-No-Init] *)
             | None ->
                 let var = sprintf "let_%s" vname in
@@ -395,7 +396,7 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
             comment = exitcomm;
             blocks =
               [
-                TAC_End_While (tac_expr_to_name bexp);
+                TAC_End_While (var);
                 TAC_Assign_Default (var, "Object");
               ];
             true_branch = None;
@@ -464,7 +465,7 @@ let tac (startNode : cfg_node) (a : exp_kind) (var : name) (cname : name)
   in
   (* make copy of currNode *)
   let _, _ = convert a var cname mname in
-  (* optimize *) startNode
+  optimize startNode
 
 let tac_output_pa4c1 (fname : name) cltype =
   
